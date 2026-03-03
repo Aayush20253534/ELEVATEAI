@@ -49,6 +49,15 @@ function App() {
         }
       />
 
+        <Route
+        path="/Interview"
+        element={
+          <ProtectedRoute>
+            <Interview-Simulator/>
+          </ProtectedRoute>
+        }
+      />
+
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

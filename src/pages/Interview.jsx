@@ -4,7 +4,6 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { LayoutDashboard, FileText, Briefcase, Mic2, Search, Bell, User, Send, Mic, Play, ChevronRight, CheckCircle2, AlertCircle, Lightbulb } from 'lucide-react';
 
-// --- Reusable Components ---
 
 const GlassCard = ({ children, className = "" }) => (
   <div className={`bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6 ${className}`}>
@@ -29,24 +28,20 @@ const NeonButton = ({ children, onClick, variant = "primary" }) => {
   );
 };
 
-// --- Main App Component ---
 
 export default function InterviewApp() {
   const [activeTab, setActiveTab] = useState('Simulator');
-  const [view, setView] = useState('setup'); // setup, interview, feedback
+  const [view, setView] = useState('setup'); 
 
   return (
     <div className="flex h-screen bg-darkBg text-slate-200 overflow-hidden font-sans">
       <Sidebar />
-      {/* Main Content Area */}
       <main className="flex-1 flex flex-col overflow-hidden relative">
-        {/* Background Glows */}
+    
         <div className="absolute top-[-10%] right-[-10%] w-96 h-96 bg-neonCyan/10 blur-[120px] rounded-full" />
         <div className="absolute bottom-[-10%] left-[-10%] w-96 h-96 bg-neonViolet/10 blur-[120px] rounded-full" />
 
-        {/* Header */}
        <Header />
-        {/* Dynamic Screens */}
         <div className="flex-1 overflow-y-auto p-8 relative z-0">
           <AnimatePresence mode="wait">
             {view === 'setup' && <SetupScreen key="setup" onStart={() => setView('interview')} />}
@@ -59,7 +54,6 @@ export default function InterviewApp() {
   );
 }
 
-// --- SCREEN 1: Setup ---
 
 function SetupScreen({ onStart }) {
   return (
@@ -111,7 +105,6 @@ function SetupScreen({ onStart }) {
   );
 }
 
-// --- SCREEN 2: Live Interview ---
 
 function InterviewScreen({ onFinish }) {
   const [messages, setMessages] = useState([
@@ -123,8 +116,7 @@ function InterviewScreen({ onFinish }) {
     if (!input.trim()) return;
     setMessages([...messages, { role: 'user', text: input }]);
     setInput("");
-    
-    // Fake AI "Thinking"
+ 
     setTimeout(() => {
       setMessages(prev => [...prev, { role: 'ai', text: "Excellent explanation. Following up on that, how does the reconciliation algorithm handle list items without unique keys?" }]);
     }, 1500);
@@ -135,7 +127,6 @@ function InterviewScreen({ onFinish }) {
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       className="h-full flex flex-col max-w-3xl mx-auto"
     >
-      {/* HUD Header */}
       <div className="flex justify-between items-center mb-6">
         <div className="flex items-center gap-4">
           <div className="px-3 py-1 bg-white/5 border border-white/10 rounded-full text-xs font-mono">
@@ -149,7 +140,6 @@ function InterviewScreen({ onFinish }) {
         <button onClick={onFinish} className="text-xs text-slate-500 hover:text-white underline">End Session</button>
       </div>
 
-      {/* Chat Area */}
       <div className="flex-1 overflow-y-auto space-y-6 mb-6 pr-4 custom-scrollbar">
         {messages.map((msg, i) => (
           <motion.div 
@@ -169,7 +159,7 @@ function InterviewScreen({ onFinish }) {
         ))}
       </div>
 
-      {/* Input Bar */}
+    
       <GlassCard className="!p-3 flex items-center gap-3">
         <button className="p-3 text-slate-400 hover:text-white transition-colors">
           <Mic size={20} />
@@ -192,7 +182,7 @@ function InterviewScreen({ onFinish }) {
   );
 }
 
-// --- SCREEN 3: Feedback ---
+
 
 function FeedbackScreen({ onReset }) {
   return (
