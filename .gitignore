@@ -1,4 +1,6 @@
 # Python
 __pycache__/
 *.pyc
-node_modules
+
+# Node
+node_modules/
