@@ -21,7 +21,7 @@ const Sidebar = () => {
     { name: "Dashboard", icon: LayoutDashboard, path: "/Dashboard" },
     { name: "Resume Analyzer", icon: FileText, path: "/ResumeAnalyzer" },
     { name: "Job Matches", icon: Briefcase, path: "/Jobs" },
-    { name: "find jobs", icon: Search, path: "/analytics" },
+    { name: "find jobs", icon: Search, path: "/Find_jobs" },
     { name: "Resume Builder", icon: FileEdit, path: "/analytics" },
     { name: "Skill Roadmap", icon: Map, path: "/roadmap" },
     { name: "Interview", icon: Mic2, path: "/Interview" },
@@ -29,8 +29,7 @@ const Sidebar = () => {
   ];
 
   return (
-    <aside className="w-64 border-r border-white/5 bg-black/20 backdrop-blur-xl flex flex-col p-6">
-
+    <aside className="fixed left-0 top-0 h-screen w-64 border-r border-white/5 bg-black/20 backdrop-blur-xl flex flex-col p-6 z-50">
       <div onClick={() => navigate("/Dashboard")} className="flex items-center gap-3 mb-10 cursor-pointer">
         <div className="p-2 bg-gradient-to-br from-cyan-500 to-violet-600 rounded-lg">
           <Sparkles className="w-6 h-6 text-white" />

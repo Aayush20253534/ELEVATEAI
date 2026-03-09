@@ -5,6 +5,7 @@ import Dashboard from "./pages/Dashboard";
 import ResumeAnalyzer from "./pages/ResumeAnalyzer";
 import JobMatchesPage from "./pages/Jobs";
 import Interview from "./pages/Interview";
+import FindJobs from "./pages/Find_jobs";
 
 
 
@@ -56,6 +57,15 @@ function App() {
         element={
           <ProtectedRoute>
             <Interview/>
+          </ProtectedRoute>
+        }
+      />
+
+        <Route
+        path="/Find_jobs"
+        element={
+          <ProtectedRoute>
+            <FindJobs/>
           </ProtectedRoute>
         }
       />

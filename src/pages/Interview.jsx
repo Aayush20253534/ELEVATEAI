@@ -53,7 +53,7 @@ export default function InterviewApp() {
     <div className="min-h-screen bg-[#050b14] text-slate-200 font-sans overflow-hidden flex">
       <Sidebar />
       
-      <main className="flex-1 flex flex-col h-screen relative overflow-hidden">
+      <main className="flex-1 flex flex-col h-screen relative overflow-hidden ml-64">
         {/* Ambient Glow */}
         <div className="absolute top-[-20%] right-[-10%] w-[50%] h-[50%] bg-cyan-500/10 rounded-full blur-[120px] pointer-events-none" />
         <div className="absolute bottom-[-20%] left-[-10%] w-[50%] h-[50%] bg-violet-600/10 rounded-full blur-[120px] pointer-events-none" />

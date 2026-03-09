@@ -58,14 +58,23 @@ const ScoreGauge = ({ score }) => {
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <motion.span 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="text-5xl font-black text-white"
-        >
-          {score}%
-        </motion.span>
-        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">ATS Match</span>
+      <div className="text-center">
+  <motion.div
+    initial={{ scale: 0.8, opacity: 0 }}
+    animate={{ scale: 1, opacity: 1 }}
+    transition={{ duration: 0.6 }}
+    className="flex items-baseline justify-center gap-1"
+  >
+    <span className="text-3xl font-semibold text-white">
+      {score}
+    </span>
+    <span className="text-sm text-slate-400 font-medium">%</span>
+  </motion.div>
+
+  <p className="text-xs text-slate-500 tracking-wide mt-1">
+    ATS Score
+  </p>
+</div>
       </div>
     </div>
   );
@@ -104,16 +113,17 @@ export default function ResumeDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-[#050b14] flex">
+    <div className="h-screen max-h-screen bg-[#050b14] flex overflow-hidden">
       <Sidebar />
       
-      <div className="flex-1 flex flex-col relative overflow-hidden">
+      <div className="flex flex-col flex-1 ml-64 min-h-screen relative">
         <div className="absolute top-[-20%] left-[10%] w-[600px] h-[600px] bg-cyan-500/10 blur-[150px] rounded-full pointer-events-none" />
         <div className="absolute bottom-[-20%] right-[10%] w-[500px] h-[500px] bg-violet-600/10 blur-[150px] rounded-full pointer-events-none" />
 
         <Header />
 
-        <main className="p-8 max-w-7xl mx-auto w-full relative z-10">
+       <main className={`flex-1 p-8 max-w-7xl mx-auto w-full relative z-10 custom-scrollbar ${data ? 'overflow-y-auto' : 'overflow-hidden'}`}>
+          
           {!data && !analyzing ? (
             <motion.div 
               initial={{ opacity: 0, scale: 0.98 }}
@@ -150,7 +160,7 @@ export default function ResumeDashboard() {
               <p className="text-slate-500 mt-2">Extracting keywords and calculating compatibility scores.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 pb-20">
+           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 min-h-full pb-6">
               
               <div className="lg:col-span-1 flex flex-col gap-8">
                 <GlassCard className="flex flex-col items-center py-10">

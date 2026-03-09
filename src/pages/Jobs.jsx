@@ -86,7 +86,7 @@ const JobMatchesPage = () => {
       <Sidebar />
        
 
-       <main className="flex-1 overflow-y-auto">
+       <main className="flex-1 overflow-y-auto ml-64">
           <Header />
           <div className="p-4 lg:p-8">
 

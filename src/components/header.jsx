@@ -38,7 +38,7 @@ const Header = () => {
     <div className="flex items-center gap-3 pl-6 border-l border-white/10">
       <div className="text-right">
 
-        <p className="text-sm font-semibold">
+        <p className="text-sm font-semibold text-white">
           {user ? user.name : "Guest"}
         </p>
 
