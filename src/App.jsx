@@ -6,6 +6,7 @@ import ResumeAnalyzer from "./pages/ResumeAnalyzer";
 import JobMatchesPage from "./pages/Jobs";
 import Interview from "./pages/Interview";
 import FindJobs from "./pages/Find_jobs";
+import ResumeBuilder from "./pages/ResumeBuilder";
 
 
 
@@ -66,6 +67,14 @@ function App() {
         element={
           <ProtectedRoute>
             <FindJobs/>
+          </ProtectedRoute>
+        }
+      />
+         <Route
+        path="/ResumeBuilder"
+        element={
+          <ProtectedRoute>
+            <ResumeBuilder/>
           </ProtectedRoute>
         }
       />

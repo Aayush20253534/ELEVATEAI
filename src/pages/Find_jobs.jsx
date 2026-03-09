@@ -31,7 +31,6 @@ const FindJobs = () => {
     e.preventDefault();
     setLoading(true);
     
-    // Simulating API Call to /search-jobs
     setTimeout(() => {
       const mockJobs = [
         { id: 1, title: "Machine Learning Engineer", company: "Google", location: "Bangalore", salary: "₹20–35 LPA", source: "LinkedIn", match_score: 92, description: "Lead the development of LLM frameworks...", skills: ["Python", "PyTorch", "Transformers"] },
@@ -59,10 +58,12 @@ const FindJobs = () => {
       <div className="flex-1 flex flex-col">
         <Header />
         
-        <main className="flex-1 overflow-y-auto pt-3 px-6 lg:px-10 ml-64 pb-20">
+        <main
+  style={{ marginLeft: "var(--sidebar-width)" }}
+  className="flex-1 overflow-y-auto pt-3 px-6 lg:px-10 pb-20"
+>
           <div className="max-w-7xl mx-auto space-y-4">
             
-            {/* HERO SECTION */}
             <motion.section 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -75,7 +76,6 @@ const FindJobs = () => {
                 Search jobs across LinkedIn, Naukri, and the open web powered by AI matching.
               </p>
 
-              {/* SEARCH BAR GLASSMORPHISM */}
               <form onSubmit={handleSearch} className="relative max-w-4xl mx-auto mt-2 p-2 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-xl shadow-2xl flex flex-col md:flex-row gap-2">
                 <div className="flex-1 flex items-center px-4 gap-3 border-r border-white/10">
                   <Search className="text-slate-500" size={20} />
@@ -100,7 +100,6 @@ const FindJobs = () => {
                 </button>
               </form>
 
-              {/* SOURCES PILLS */}
               <div className="flex flex-wrap justify-center gap-3 mt-6">
                 {sources.map(source => (
                   <button
@@ -117,8 +116,6 @@ const FindJobs = () => {
                 ))}
               </div>
             </motion.section>
-
-            {/* RESULTS SECTION */}
             <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <AnimatePresence>
                 {loading ? (
@@ -143,7 +140,6 @@ const FindJobs = () => {
         </main>
       </div>
 
-      {/* DETAIL MODAL */}
       <AnimatePresence>
         {selectedJob && <JobModal job={selectedJob} onClose={() => setSelectedJob(null)} />}
       </AnimatePresence>

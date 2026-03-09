@@ -86,7 +86,10 @@ const JobMatchesPage = () => {
       <Sidebar />
        
 
-       <main className="flex-1 overflow-y-auto ml-64">
+       <main
+  style={{ marginLeft: "var(--sidebar-width)" }}
+  className="flex-1 overflow-y-auto"
+>
           <Header />
           <div className="p-4 lg:p-8">
 
