@@ -1,7 +1,30 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Search, Bell, User } from "lucide-react";
+import axios from "axios";
 
 const Header = () => {
+
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+
+    if(token){
+      axios.get("http://127.0.0.1:8000/me", {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      })
+      .then(res => {
+        setUser(res.data);
+      })
+      .catch(err => {
+        console.log(err);
+      });
+    }
+
+  }, []);
+
   return (
     <header className="h-20 border-b border-white/5 flex items-center justify-between px-8 sticky top-0 bg-[#050b14]/80 backdrop-blur-md z-20">
       
@@ -23,7 +46,12 @@ const Header = () => {
 
         <div className="flex items-center gap-3 pl-6 border-l border-white/10">
           <div className="text-right">
-            <p className="text-sm font-semibold">Aayush Thakur</p>
+
+            {/* Dynamic Name */}
+            <p className="text-sm font-semibold">
+              {user ? user.name : "Guest"}
+            </p>
+
             <p className="text-[10px] text-cyan-500 uppercase tracking-widest font-bold">
               Pro Member
             </p>

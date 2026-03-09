@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import axios from "axios";
 import Sidebar from "../components/sidebar";
 import Header from "../components/header";
 import {
@@ -25,6 +26,26 @@ const Dashboard = () => {
     { company: 'Google', role: 'Full Stack Dev', match: 72 },
   ];
 
+  const [user, setUser] = useState(null);
+
+useEffect(() => {
+  const token = localStorage.getItem("token");
+
+  if(token){
+    axios.get("http://127.0.0.1:8000/me", {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    })
+    .then(res => {
+      setUser(res.data);
+    })
+    .catch(err => {
+      console.log(err);
+    });
+  }
+}, []);
+
   return (
     <div className="min-h-screen bg-[#050b14] text-slate-200 font-sans overflow-hidden relative">
 
@@ -43,8 +64,8 @@ const Dashboard = () => {
 
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
               <h2 className="text-4xl font-bold text-white">
-                Welcome back, Aayush
-              </h2>
+                Welcome back, {user ? user.name : "User"}
+              </h2> 
               <p className="text-slate-400 mt-2 flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-cyan-400" />
                 Your AI Career Copilot is ready.
