@@ -90,6 +90,7 @@ const JobMatchesPage = () => {
   style={{ marginLeft: "var(--sidebar-width)" }}
   className="flex-1 overflow-y-auto"
 >
+          <Header />
           <div className="p-4 lg:p-8">
 
           <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
