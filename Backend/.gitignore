@@ -1,3 +1,5 @@
-# Python
+node_modules/
 __pycache__/
-*.pyc
+*.db
+.env
+Backend/uploads/
