@@ -1,5 +1,7 @@
 import React from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
+
+import LandingPage from "./pages/landingpage";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import ResumeAnalyzer from "./pages/ResumeAnalyzer";
@@ -12,25 +14,31 @@ import ProfilePage from "./pages/profile";
 import LeaderboardPage from "./pages/leaderboard";
 
 
-
 const ProtectedRoute = ({ children }) => {
   const user = localStorage.getItem("user");
   const location = useLocation();
 
   if (!user) {
-    return <Navigate to="/" state={{ from: location }} replace />;
+    return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
   return children;
 };
 
+
 function App() {
   return (
     <Routes>
-      <Route path="/" element={<Login />} />
 
+      {/* Landing page */}
+      <Route path="/" element={<LandingPage />} />
+
+      {/* Auth pages */}
+      <Route path="/login" element={<Login />} />
+
+      {/* Protected routes */}
       <Route
-        path="/Dashboard"
+        path="/dashboard"
         element={
           <ProtectedRoute>
             <Dashboard />
@@ -39,7 +47,7 @@ function App() {
       />
 
       <Route
-        path="/ResumeAnalyzer"
+        path="/resume-analyzer"
         element={
           <ProtectedRoute>
             <ResumeAnalyzer />
@@ -48,7 +56,7 @@ function App() {
       />
 
       <Route
-        path="/Jobs"
+        path="/jobs"
         element={
           <ProtectedRoute>
             <JobMatchesPage />
@@ -56,58 +64,63 @@ function App() {
         }
       />
 
-        <Route
-        path="/Interview"
+      <Route
+        path="/interview"
         element={
           <ProtectedRoute>
-            <Interview/>
+            <Interview />
           </ProtectedRoute>
         }
       />
 
-        <Route
-        path="/Find_jobs"
+      <Route
+        path="/find-jobs"
         element={
           <ProtectedRoute>
-            <FindJobs/>
+            <FindJobs />
           </ProtectedRoute>
         }
       />
-         <Route
-        path="/ResumeBuilder"
+
+      <Route
+        path="/resume-builder"
         element={
           <ProtectedRoute>
-            <ResumeBuilder/>
+            <ResumeBuilder />
           </ProtectedRoute>
         }
       />
-       <Route
-        path="/Roadmap"
+
+      <Route
+        path="/roadmap"
         element={
           <ProtectedRoute>
-            <SkillRoadmap/>
+            <SkillRoadmap />
           </ProtectedRoute>
         }
       />
-       <Route
+
+      <Route
         path="/profile"
         element={
           <ProtectedRoute>
-            <ProfilePage/>
+            <ProfilePage />
           </ProtectedRoute>
         }
       />
+
       <Route
         path="/leaderboard"
         element={
           <ProtectedRoute>
-            <LeaderboardPage/>
+            <LeaderboardPage />
           </ProtectedRoute>
         }
       />
 
-
+      {/* Unknown route */}
       <Route path="*" element={<Navigate to="/" replace />} />
+
     </Routes>
   );
 }
