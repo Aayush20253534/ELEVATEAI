@@ -28,8 +28,14 @@ const StatCard = ({ icon: Icon, label, value, color }) => (
       <div className={`p-2 rounded-lg bg-white/5 border border-white/10 ${color.replace('bg-', 'text-')}`}>
         <Icon size={20} />
       </div>
-      <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-        Live Update
+      <div className="flex items-center gap-2">
+        <div className="relative flex h-2 w-2">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75"></span>
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+        </div>
+        <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+          Live Update
+        </div>
       </div>
     </div>
     <div className="text-2xl font-bold text-white mb-1">{value}</div>
@@ -129,34 +135,31 @@ export default function CareerDashboard() {
           <div className="grid lg:grid-cols-12 gap-8">
             
             <div className="lg:col-span-4 flex flex-col gap-8">
-    
               <div className="bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-md">
                 <h3 className="text-sm font-semibold text-white mb-6 flex items-center justify-between">
-                  Skill Breakdown
-                  <CheckCircle2 size={14} className="text-emerald-500" />
+                  Next Milestone
+                  <Cpu size={14} className="text-blue-400" />
                 </h3>
-                <div className="space-y-4">
-                  {[
-                    { name: 'React/Next.js', level: 90, color: 'bg-blue-500' },
-                    { name: 'TypeScript', level: 75, color: 'bg-indigo-500' },
-                    { name: 'Node.js', level: 60, color: 'bg-emerald-500' },
-                    { name: 'System Design', level: 45, color: 'bg-purple-500' },
-                  ].map((skill) => (
-                    <div key={skill.name}>
-                      <div className="flex justify-between text-[10px] mb-1.5 uppercase tracking-wider font-bold">
-                        <span className="text-slate-400">{skill.name}</span>
-                        <span className="text-slate-200">{skill.level}%</span>
-                      </div>
-                      <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
-                        <motion.div 
-                          initial={{ width: 0 }}
-                          animate={{ width: `${skill.level}%` }}
-                          transition={{ duration: 1, delay: 0.2 }}
-                          className={`h-full ${skill.color} rounded-full`} 
-                        />
-                      </div>
+                <div className="space-y-6">
+                  <div>
+                    <div className="flex justify-between items-end mb-2">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">AWS Cloud Practitioner</span>
+                      <span className="text-sm font-bold text-blue-400">65%</span>
                     </div>
-                  ))}
+                    <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: '65%' }}
+                        transition={{ duration: 1.5 }}
+                        className="h-full bg-blue-500 rounded-full"
+                      />
+                    </div>
+                  </div>
+                  <div className="p-3 bg-white/5 rounded-xl border border-white/5">
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      Complete <span className="text-blue-400 font-medium">EC2 Fundamentals</span> to reach 80% readiness.
+                    </p>
+                  </div>
                 </div>
               </div>
 
@@ -170,51 +173,54 @@ export default function CareerDashboard() {
               </div>
             </div>
 
-            <div className="lg:col-span-4 flex flex-col gap-8">
-              <div className="bg-white/5 border border-white/10 rounded-3xl p-8 flex flex-col items-center justify-center text-center relative overflow-hidden group">
-                <div className="absolute inset-0 bg-blue-600/[0.02] group-hover:bg-blue-600/[0.05] transition-colors" />
+            <div className="lg:col-span-4">
+              <div className="bg-white/5 border border-white/10 rounded-3xl p-8 flex flex-col relative overflow-hidden group h-full">
+                <div className="absolute inset-0 bg-emerald-600/[0.02] group-hover:bg-emerald-600/[0.05] transition-colors" />
                 
-                <div className="relative w-24 h-24 mb-6">
-                   <div className="absolute inset-0 bg-blue-500/20 blur-2xl rounded-full animate-pulse" />
-                   <div className="relative w-full h-full rounded-full border border-blue-500/30 flex items-center justify-center bg-[#0a121e]">
-                      <Cpu size={36} className="text-blue-400" />
-                   </div>
-                </div>
-                
-                <h3 className="text-xl font-bold text-white mb-1">Next Milestone</h3>
-                <p className="text-xs text-slate-500 uppercase tracking-tighter mb-8 font-bold">Active Training</p>
-
-                <div className="w-full space-y-6">
+                <div className="flex justify-between items-start mb-8">
                   <div>
-                    <div className="flex justify-between items-end mb-2">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-left">AWS Cloud Practitioner</span>
-                      <span className="text-xl font-black text-blue-400">65%</span>
-                    </div>
-                    <div className="w-full h-3 bg-white/5 rounded-full overflow-hidden p-1 border border-white/5">
-                      <motion.div
-                        initial={{ width: 0 }}
-                        animate={{ width: '65%' }}
-                        transition={{ duration: 1.5, ease: "easeOut" }}
-                        className="h-full bg-gradient-to-r from-blue-600 to-cyan-400 rounded-full"
-                      />
-                    </div>
+                    <h3 className="text-xl font-bold text-white mb-1">Skill Breakdown</h3>
+                    <p className="text-xs text-slate-500 uppercase tracking-tighter font-bold">Current Proficiency</p>
                   </div>
-                  
-                  <div className="p-4 bg-white/[0.02] rounded-2xl border border-white/5 backdrop-blur-sm">
-                    <p className="text-xs text-slate-300 leading-relaxed italic">
-                      "Complete <span className="text-blue-400 font-semibold">EC2 Fundamentals</span> to reach 80% readiness."
-                    </p>
+                  <div className="relative w-12 h-12">
+                    <div className="absolute inset-0 bg-emerald-500/20 blur-xl rounded-full animate-pulse" />
+                    <div className="relative w-full h-full rounded-full border border-emerald-500/30 flex items-center justify-center bg-[#0a121e]">
+                       <CheckCircle2 size={20} className="text-emerald-400" />
+                    </div>
                   </div>
                 </div>
 
-                <button className="mt-8 w-full py-4 bg-white text-[#050b14] hover:bg-blue-400 transition-colors rounded-2xl font-bold text-sm shadow-xl shadow-blue-500/10">
-                  Resume Course
+                <div className="w-full space-y-5 flex-1">
+                  {[
+                    { name: 'React/Next.js', level: 90, color: 'from-blue-600 to-blue-400' },
+                    { name: 'TypeScript', level: 75, color: 'from-indigo-600 to-indigo-400' },
+                    { name: 'Node.js', level: 60, color: 'from-emerald-600 to-emerald-400' },
+                    { name: 'System Design', level: 45, color: 'from-purple-600 to-purple-400' },
+                  ].map((skill) => (
+                    <div key={skill.name}>
+                      <div className="flex justify-between items-end mb-2">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{skill.name}</span>
+                        <span className="text-xs font-black text-white">{skill.level}%</span>
+                      </div>
+                      <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden p-0.5 border border-white/5">
+                        <motion.div
+                          initial={{ width: 0 }}
+                          animate={{ width: `${skill.level}%` }}
+                          transition={{ duration: 1, ease: "easeOut" }}
+                          className={`h-full bg-gradient-to-r ${skill.color} rounded-full`}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <button className="mt-8 w-full py-4 bg-white text-[#050b14] hover:bg-emerald-400 transition-colors rounded-2xl font-bold text-sm shadow-xl shadow-emerald-500/10">
+                  View Full Roadmap
                 </button>
               </div>
             </div>
 
             <div className="lg:col-span-4 flex flex-col gap-8">
-      
               <div className="bg-gradient-to-br from-blue-600/20 via-blue-600/5 to-transparent border border-blue-500/20 rounded-2xl p-6 backdrop-blur-md">
                 <div className="flex items-center gap-2 mb-6">
                   <div className="p-1.5 bg-blue-500 rounded-lg shadow-lg shadow-blue-500/20">
