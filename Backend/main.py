@@ -1,18 +1,21 @@
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, UploadFile, File
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from passlib.context import CryptContext
 from jose import jwt, JWTError
 from datetime import datetime, timedelta
+from typing import List
 import sqlite3
-
-from fastapi import UploadFile, File
 import shutil
 import uuid
 import os
 
+from web_scraping import LinkedInScraper, NaukriScraper, SerpApiScraper
+
 app = FastAPI()
+
+# ---------------- CORS ---------------- #
 
 app.add_middleware(
     CORSMiddleware,
@@ -22,6 +25,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ---------------- DATABASE ---------------- #
 
 conn = sqlite3.connect("users.db", check_same_thread=False)
 cursor = conn.cursor()
@@ -38,6 +42,7 @@ CREATE TABLE IF NOT EXISTS users (
 
 conn.commit()
 
+# ---------------- AUTH CONFIG ---------------- #
 
 SECRET_KEY = "supersecretkey"
 ALGORITHM = "HS256"
@@ -46,9 +51,11 @@ TOKEN_EXPIRE_HOURS = 24
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 security = HTTPBearer()
 
+# ---------------- REQUEST MODELS ---------------- #
+
 class SignupRequest(BaseModel):
     name: str
-    linkedin :str
+    linkedin: str
     email: str
     password: str
 
@@ -58,15 +65,25 @@ class LoginRequest(BaseModel):
     password: str
 
 
-def hash_password(password):
+class JobSearchRequest(BaseModel):
+    query: str
+    location: str
+    sources: List[str]
+
+
+# ---------------- PASSWORD UTILS ---------------- #
+
+def hash_password(password: str):
     return pwd_context.hash(password)
 
 
-def verify_password(password, hashed):
+def verify_password(password: str, hashed: str):
     return pwd_context.verify(password, hashed)
 
 
-def create_token(user_id):
+# ---------------- JWT UTILS ---------------- #
+
+def create_token(user_id: str):
 
     payload = {
         "user_id": user_id,
@@ -76,7 +93,7 @@ def create_token(user_id):
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
 
-def verify_token(token):
+def verify_token(token: str):
 
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
@@ -85,6 +102,8 @@ def verify_token(token):
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
+
+# ---------------- AUTH ROUTES ---------------- #
 
 @app.post("/signup")
 def signup(data: SignupRequest):
@@ -98,7 +117,7 @@ def signup(data: SignupRequest):
     hashed = hash_password(data.password)
 
     cursor.execute(
-        "INSERT INTO users (name,linkedin,email,password) VALUES (?,?,?,?)",
+        "INSERT INTO users (name, linkedin, email, password) VALUES (?, ?, ?, ?)",
         (data.name, data.linkedin, data.email, hashed)
     )
 
@@ -110,7 +129,11 @@ def signup(data: SignupRequest):
 @app.post("/login")
 def login(data: LoginRequest):
 
-    cursor.execute("SELECT name,linkedin,email,password FROM users WHERE email = ?", (data.email,))
+    cursor.execute(
+        "SELECT name, linkedin, email, password FROM users WHERE email = ?",
+        (data.email,)
+    )
+
     user = cursor.fetchone()
 
     if not user:
@@ -144,6 +167,7 @@ def dashboard(credentials: HTTPAuthorizationCredentials = Depends(security)):
         "user": user_id
     }
 
+
 @app.get("/me")
 def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
 
@@ -151,7 +175,7 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
     email = verify_token(token)
 
     cursor.execute(
-        "SELECT name, linkedin, email FROM users WHERE email=?",
+        "SELECT name, linkedin, email FROM users WHERE email = ?",
         (email,)
     )
 
@@ -168,9 +192,12 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
         "email": email
     }
 
-UPLOAD_DIR = "uploads"
 
+# ---------------- FILE UPLOAD ---------------- #
+
+UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+
 
 @app.post("/upload-resume")
 async def upload_resume(file: UploadFile = File(...)):
@@ -187,3 +214,63 @@ async def upload_resume(file: UploadFile = File(...)):
         "filename": file.filename,
         "message": "File uploaded successfully"
     }
+
+
+# ---------------- JOB SEARCH ---------------- #
+
+@app.post("/jobs/search")
+def search_jobs(data: JobSearchRequest):
+
+    results = []
+
+    try:
+
+        if "linkedin" in data.sources:
+            linkedin = LinkedInScraper()
+            results += linkedin.fetch_jobs(data.query, data.location)
+
+        if "naukri" in data.sources:
+            naukri = NaukriScraper()
+            results += naukri.fetch_jobs(data.query, data.location)
+
+        if "web" in data.sources:
+            serp = SerpApiScraper()
+            results += serp.fetch_jobs(data.query, data.location)
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    return {"jobs": results}
+
+@app.get("/jobs")
+def get_jobs():
+
+    linkedin = LinkedInScraper()
+    naukri = NaukriScraper()
+    web = SerpApiScraper()
+
+    jobs = []
+
+    try:
+        linkedin_jobs = linkedin.fetch_jobs("Software Engineer", "India")
+        if isinstance(linkedin_jobs, list):
+            for j in linkedin_jobs:
+                j["source"] = "LinkedIn"
+                jobs.append(j)
+
+        naukri_jobs = naukri.fetch_jobs("Software Engineer", "India")
+        if isinstance(naukri_jobs, list):
+            for j in naukri_jobs:
+                j["source"] = "Naukri"
+                jobs.append(j)
+
+        web_jobs = web.fetch_jobs("Software Engineer", "India")
+        if isinstance(web_jobs, list):
+            for j in web_jobs:
+                j["source"] = "Web"
+                jobs.append(j)
+
+    except Exception as e:
+        print("Job fetch error:", e)
+
+    return {"jobs": jobs}   
