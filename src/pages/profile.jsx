@@ -260,12 +260,12 @@ const ProfilePage = () => {
     formData.append("file", file)
 
     const res = await axios.post(
-  "http://127.0.0.1:8000/profile/upload-cover",
-  formData,
-  { headers: { Authorization: `Bearer ${token}` } }
-)
+      "http://127.0.0.1:8000/profile/upload-cover",
+      formData,
+      { headers: { Authorization: `Bearer ${token}` } }
+    )
 
-setCoverImage(res.data.cover_image)
+    setCoverImage(res.data.cover_image)
   }
 
   const handleImageChange = (e, type) => {
@@ -297,12 +297,12 @@ setCoverImage(res.data.cover_image)
             {/* Cover Image Container */}
             <div className="group relative h-48 w-full rounded-3xl border border-white/10 overflow-hidden bg-gradient-to-r from-blue-900/40 via-purple-900/40 to-black">
               {coverImage && (
-  <img
-    src={`http://127.0.0.1:8000${coverImage}`}
-    alt="Cover"
-    className="w-full h-full object-cover"
-  />
-)}
+                <img
+                  src={`http://127.0.0.1:8000${coverImage}`}
+                  alt="Cover"
+                  className="w-full h-full object-cover"
+                />
+              )}
 
               {/* Cover Image Upload Button */}
               <button
@@ -320,10 +320,10 @@ setCoverImage(res.data.cover_image)
               <div className="relative group">
                 <div className="w-32 h-32 rounded-3xl overflow-hidden border-4 border-[#050b14] shadow-2xl bg-gray-800 flex items-center justify-center">
                   {image ? (
-  <img src={`http://127.0.0.1:8000${image}`} className="w-full h-full object-cover" />
-) : (
-  <User size={48} className="text-gray-500" />
-)}
+                    <img src={`http://127.0.0.1:8000${image}`} className="w-full h-full object-cover" />
+                  ) : (
+                    <User size={48} className="text-gray-500" />
+                  )}
                 </div>
                 <button onClick={() => profileInputRef.current?.click()} className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity rounded-3xl">
                   <Camera className="text-white" />
