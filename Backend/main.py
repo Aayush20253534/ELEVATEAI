@@ -20,6 +20,7 @@ from langchain_core.messages import HumanMessage
 from dotenv import load_dotenv
 from pydantic import Field
 from fastapi import Form
+from fastapi.staticfiles import StaticFiles
 
 from interview_ai import generate_question, evaluate_answer
 from models import InterviewStart, InterviewAnswer
@@ -28,6 +29,7 @@ from chatbot_service import ask_bot
 from web_scraping import LinkedInScraper, NaukriScraper, SerpApiScraper
 
 app = FastAPI()
+app.mount("/images", StaticFiles(directory="profile_images"), name="images")
 load_dotenv()
 
 llm = ChatGoogleGenerativeAI(
@@ -36,6 +38,9 @@ llm = ChatGoogleGenerativeAI(
     temperature=0
 )
 
+PROFILE_DIR = "profile_images"
+os.makedirs(PROFILE_DIR, exist_ok=True)
+
 class MarketReadiness(BaseModel):
     key_strengths: List[str] = Field(description="Top strengths")
     critical_gaps: List[str] = Field(description="Major missing qualifications")
@@ -43,12 +48,20 @@ class MarketReadiness(BaseModel):
     ai_suggestion: str = Field(description="Strategic advice")
     market_readiness: str = Field(description="High, Medium, or Low readiness")
     skills: List[str] = Field(description="List of technical skills extracted from the resume")
-    
+
+class ProfileUpdate(BaseModel):
+    name: str
+    username: str
+    phone: str
+    bio: str
+    current_role: str
+    target_role: str
+    professional_links: list
 
 structured_llm = llm.with_structured_output(MarketReadiness)
 
 def get_db():
-    conn = sqlite3.connect("users.db")
+    conn = sqlite3.connect("users.db", check_same_thread=False)
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -101,21 +114,35 @@ app.add_middleware(
 )
 
 # ---------------- DATABASE ---------------- #
-conn = get_db()
-cursor = conn.cursor()
+def init_db():
+    conn = sqlite3.connect("users.db")
+    cursor = conn.cursor()
 
-cursor.execute("""
-CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT,
-    linkedin TEXT,
-    email TEXT UNIQUE,
-    password TEXT,
-    market_readiness TEXT,
-    skills TEXT
-)
-""")
-conn.commit()
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT,
+        username TEXT,
+        email TEXT UNIQUE,
+        password TEXT,
+        phone TEXT,
+        bio TEXT,
+        linkedin TEXT,
+        current_role TEXT,
+        target_role TEXT,
+        professional_links TEXT,
+        profile_image TEXT,
+        cover_image TEXT,
+        market_readiness TEXT,
+        skills TEXT
+    )
+    """)
+
+    conn.commit()
+    conn.close()
+
+
+init_db()
 
 # ---------------- AUTH CONFIG ---------------- #
 
@@ -184,11 +211,14 @@ def verify_token(token: str):
 
 @app.post("/signup")
 def signup(data: SignupRequest):
+    conn = get_db()
+    cursor = conn.cursor()
 
     cursor.execute("SELECT * FROM users WHERE email = ?", (data.email,))
     existing_user = cursor.fetchone()
 
     if existing_user:
+        conn.close()
         raise HTTPException(status_code=400, detail="User already exists")
 
     hashed = hash_password(data.password)
@@ -199,6 +229,7 @@ def signup(data: SignupRequest):
     )
 
     conn.commit()
+    conn.close()
 
     return {"message": "User created"}
 
@@ -206,12 +237,16 @@ def signup(data: SignupRequest):
 @app.post("/login")
 def login(data: LoginRequest):
 
+    conn = get_db()
+    cursor = conn.cursor()
+
     cursor.execute(
         "SELECT name, linkedin, email, password FROM users WHERE email = ?",
         (data.email,)
     )
 
     user = cursor.fetchone()
+    conn.close()
 
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
@@ -244,7 +279,6 @@ def dashboard(credentials: HTTPAuthorizationCredentials = Depends(security)):
         "user": user_id
     }
 
-
 @app.get("/me")
 def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
 
@@ -254,28 +288,131 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
     conn = get_db()
     cursor = conn.cursor()
 
-    cursor.execute(
-        "SELECT name, linkedin, email, market_readiness, skills FROM users WHERE email = ?",
-        (email,)
-    )
-
+    cursor.execute("SELECT * FROM users WHERE email = ?", (email,))
     user = cursor.fetchone()
     conn.close()
 
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    
-    name, linkedin, email, readiness, skills = user
-    skills = json.loads(skills) if skills else []
     return {
-        "name": name,
-        "linkedin": linkedin,
-        "email": email,
-        "market_readiness": readiness,
-        "skills": skills
+        "name": user["name"],
+        "username": user["username"],
+        "email": user["email"],
+        "phone": user["phone"],
+        "bio": user["bio"],
+        "linkedin": user["linkedin"],
+        "current_role": user["current_role"],
+        "target_role": user["target_role"],
+        "profile_image": user["profile_image"],
+        "cover_image": user["cover_image"],
+        "professional_links": json.loads(user["professional_links"]) if user["professional_links"] else [],
+        "market_readiness": user["market_readiness"],
+        "skills": json.loads(user["skills"]) if user["skills"] else []
     }
 
+
+@app.post("/profile/update")
+def update_profile(
+    data: ProfileUpdate,
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+
+    token = credentials.credentials
+    email = verify_token(token)
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        UPDATE users
+        SET name=?,
+            username=?,
+            phone=?,
+            bio=?,
+            current_role=?,
+            target_role=?,
+            professional_links=?
+        WHERE email=?
+    """, (
+        data.name,
+        data.username,
+        data.phone,
+        data.bio,
+        data.current_role,
+        data.target_role,
+        json.dumps(data.professional_links),
+        email
+    ))
+
+    conn.commit()
+    conn.close()
+
+    return {"message": "Profile updated"}
+
+
+@app.post("/profile/upload-image")
+async def upload_profile_image(
+    file: UploadFile = File(...),
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+
+    token = credentials.credentials
+    email = verify_token(token)
+
+    ext = file.filename.split(".")[-1]
+    filename = f"{uuid.uuid4()}.{ext}"
+    path = os.path.join(PROFILE_DIR, filename)
+
+    contents = await file.read()
+
+    with open(path, "wb") as f:
+        f.write(contents)
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute(
+    "UPDATE users SET profile_image=? WHERE email=?",
+    (f"/images/{filename}", email)
+)
+
+    conn.commit()
+    conn.close()
+
+    return {"profile_image": f"/images/{filename}"}
+
+
+@app.post("/profile/upload-cover")
+async def upload_cover_image(
+    file: UploadFile = File(...),
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+
+    token = credentials.credentials
+    email = verify_token(token)
+
+    ext = file.filename.split(".")[-1]
+    filename = f"{uuid.uuid4()}.{ext}"
+    path = os.path.join(PROFILE_DIR, filename)
+
+    contents = await file.read()
+
+    with open(path, "wb") as f:
+        f.write(contents)
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute(
+    "UPDATE users SET cover_image=? WHERE email=?",
+    (f"/images/{filename}", email)
+)
+
+    conn.commit()
+    conn.close()
+
+    return {"cover_image": f"/images/{filename}"}
 
 
 # ---------------- FILE UPLOAD ---------------- #
@@ -316,11 +453,16 @@ async def upload_resume(
         report = await analyze_resume(contents, target_job)
 
 
+        conn = get_db()
+        cursor = conn.cursor()
+
         cursor.execute(
             "UPDATE users SET market_readiness = ?, skills = ? WHERE email = ?",
             (report["market_readiness"], json.dumps(report["skills"]), email)
         )
+
         conn.commit()
+        conn.close()
 
         return {
             "filename": unique_name,
@@ -433,6 +575,3 @@ def submit_answer(data: InterviewAnswer):
     return {
         "analysis": result
     }
-
-conn.commit()
-conn.close()
