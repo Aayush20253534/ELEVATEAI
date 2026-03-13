@@ -53,6 +53,8 @@ class MarketReadiness(BaseModel):
 
 class RoadmapRequest(BaseModel):
     topic: str
+    experience_level: str
+    learning_style: str
     limit: int = 5
 
 class ProfileUpdate(BaseModel):
@@ -289,8 +291,10 @@ def dashboard(credentials: HTTPAuthorizationCredentials = Depends(security)):
 def generate_roadmap(data: RoadmapRequest):
 
     try:
-        roadmap = roadmap_engine.generate_roadmap(
+        roadmap = roadmap_engine.get_roadmap(
             topic=data.topic,
+            experience_level=data.experience_level,
+            learning_style=data.learning_style,
             upper_limit=data.limit
         )
 

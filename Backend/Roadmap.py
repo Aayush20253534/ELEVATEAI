@@ -136,6 +136,3 @@ class Roadmap:
         return self.generate_roadmap(corrected_topic, experience_level, learning_style, upper_limit)
 
 
-#Usage Example - 
-R = Roadmap()
-print(R.generate_roadmap(topic = "Software Devlopment"))
