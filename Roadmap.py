@@ -72,7 +72,7 @@ class Roadmap:
             "topic": topic,
             "upper_limit": upper_limit
         })
-        print("🔍 Fetching learning links via Tavily")
+        print("Fetching learning links via Tavily")
         for category in ['basic', 'core', 'advanced']:
             concepts = getattr(response,category)
             for concept in concepts:
