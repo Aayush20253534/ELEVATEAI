@@ -12,6 +12,12 @@ import uuid
 import os
 import whisper
 
+import base64
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_core.messages import HumanMessage
+from dotenv import load_dotenv
+from pydantic import Field
+
 from interview_ai import generate_question, evaluate_answer
 from models import InterviewStart, InterviewAnswer
 
@@ -19,6 +25,61 @@ from chatbot_service import ask_bot
 from web_scraping import LinkedInScraper, NaukriScraper, SerpApiScraper
 
 app = FastAPI()
+load_dotenv()
+
+llm = ChatGoogleGenerativeAI(
+    model="gemini-2.5-flash-lite",
+    api_key=os.getenv("GOOGLE_API_KEY"),
+    temperature=0
+)
+
+class MarketReadiness(BaseModel):
+    key_strengths: List[str] = Field(description="Top strengths")
+    critical_gaps: List[str] = Field(description="Major missing qualifications")
+    missing_keywords: List[str] = Field(description="Missing ATS keywords")
+    ai_suggestion: str = Field(description="Strategic advice")
+    market_readiness: str = Field(
+        description="Overall readiness for the target role. Must be one of: High, Medium, Low."
+    )
+    
+
+structured_llm = llm.with_structured_output(MarketReadiness)
+
+
+async def analyze_resume(pdf_bytes: bytes, target_role: str):
+
+    pdf_data = base64.b64encode(pdf_bytes).decode("utf-8")
+
+    message = HumanMessage(
+        content=[
+                {
+                "type": "text",
+                "text": f"""
+Analyze this resume for the role: {target_role}.
+
+Return:
+- key strengths
+- critical gaps
+- missing keywords
+- a short improvement suggestion
+
+Also determine the candidate's **market readiness for this role** based on current skills and experience.
+
+Market readiness must be classified as one of:
+High → strong match, likely ready for interviews
+Medium → somewhat aligned but needs improvement
+Low → major gaps for this role
+"""},
+            {
+                "type": "media",
+                "mime_type": "application/pdf",
+                "data": pdf_data
+            }
+        ]
+    )
+
+    result = structured_llm.invoke([message])
+    return result.model_dump()
 
 # ---------------- CORS ---------------- #
 
@@ -206,36 +267,46 @@ UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
+from fastapi import Form
 @app.post("/upload-resume")
-async def upload_resume(file: UploadFile = File(...)):
+async def upload_resume(
+    file: UploadFile = File(...),
+    target_job: str = Form(...)
+):
 
-    file_ext = file.filename.split(".")[-1]
-    unique_name = f"{uuid.uuid4()}.{file_ext}"
-    file_path = os.path.join(UPLOAD_DIR, unique_name)
+    try:
+        # Ensure uploads folder exists
+        upload_dir = "uploads"
+        os.makedirs(upload_dir, exist_ok=True)
 
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+        # Create unique filename
+        file_ext = file.filename.split(".")[-1]
+        unique_name = f"{uuid.uuid4()}.{file_ext}"
+        file_path = os.path.join(upload_dir, unique_name)
 
-    return {
-        "ats_score": 82,
-        "strengths": [
-            "Strong React + Node stack",
-            "Quantified project achievements"
-        ],
-        "weaknesses": [
-            "Missing cloud infrastructure",
-            "No CI/CD references"
-        ],
-        "missing_keywords": [
-            "Docker",
-            "Kubernetes",
-            "Redis"
-        ],
-        "suggestions": [
-            "Add project metrics like performance improvements"
-        ]
-    }
+        # Read file
+        contents = await file.read()
 
+        # Save file to uploads folder
+        with open(file_path, "wb") as f:
+            f.write(contents)
+
+        # Run AI analysis
+        report = await analyze_resume(contents, target_job)
+
+        return {
+    "filename": unique_name,
+    "file_path": file_path,
+    "ats_score": 80,
+    "market_readiness": report["market_readiness"],
+    "strengths": report["key_strengths"],
+    "weaknesses": report["critical_gaps"],
+    "missing_keywords": report["missing_keywords"],
+    "suggestions": [report["ai_suggestion"]]
+}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 # ---------------- JOB SEARCH ---------------- #
 
 @app.post("/jobs/search")

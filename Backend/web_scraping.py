@@ -65,7 +65,7 @@ class LinkedInScraper(JobScraper):
 
 class NaukriScraper(JobScraper):
     def __init__(self):
-        self.token = os.getenv("APIFY_API_KEY")
+        self.token = os.getenv("APIFY_TOKEN")
         self.client = ApifyClient(self.token) if self.token else None
 
     def fetch_jobs(self, query="software engineer", location="Bangalore", max_results=5):
