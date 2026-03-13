@@ -12,7 +12,7 @@ from langchain_tavily import TavilySearch
 load_dotenv()
 
 class Concept(BaseModel):
-    title: str = Field(..., description="The name of a specific, technical concept")
+    title: str = Field(..., description="The name of a specific concept")
     toughness:Literal['Easy','Medium','Hard'] = Field(...,description="Toughness level of the technical concept")
     learning_link: str | None = None # This will be filled by Tavily
     search_query: str = Field(..., description="A specific search query to find a tutorial for this concept")
@@ -26,7 +26,7 @@ class LearningRoadmap(BaseModel):
     advanced: List[Concept] = Field(..., description="Specialized, high-scale, or research-level concepts")
 
 class TopicValidation(BaseModel):
-    is_technical: bool = Field(..., description="Whether the topic is a valid technical or professional domain.")
+    is_technical: bool = Field(..., description="Whether the topic is a valid professional domain.")
     corrected_topic: str = Field(..., description="The corrected version of the topic (fixing typos) or a 'N/A'.")
     reason: str = Field(..., description="A short reason why the topic was accepted or rejected.")
 
@@ -42,9 +42,9 @@ class Roadmap:
         validator_llm = self.llm.with_structured_output(TopicValidation)
         
         system_msg = (
-    "You are a Technical Domain Verifier. Your only job is to decide if an input "
+    "You are a Profession and Technical Domain Verifier. Your only job is to decide if an input "
     "is a field one can study or work in professionally. "
-    "\n\nVALID EXAMPLES: 'Software Engineering', 'Python', 'Data Science', 'React', 'DevOps', 'Project Management'."
+    "\n\nVALID EXAMPLES: 'AI Engineer', 'Electrician', 'Carpenter', 'Product Manager', 'Cybersecurity Analyst', 'CEO'."
     "\nINVALID EXAMPLES: 'how to eat', 'I am bored', 'random gibberish', 'asdfghjkl'."
     "\n\nRULES:"
     "\n1. If it is a professional or technical field, set is_technical = True."
@@ -139,7 +139,7 @@ class Roadmap:
 #Usage Example - 
 R = Roadmap()
 result = R.get_roadmap(
-    topic="Software Engineering",
+    topic="Carpenter",
     experience_level="Intermediate",
     learning_style="Project-Based",
     upper_limit=3
