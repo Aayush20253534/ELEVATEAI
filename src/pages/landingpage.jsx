@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { 
   Users, Zap, Target, Star, Code2, 
   Briefcase, Globe, ArrowRight, Shield, 
-  LayoutDashboard, Terminal, Sparkles, Instagram, Linkedin, Twitter
+  LayoutDashboard, Terminal, Sparkles, Instagram, Linkedin, Twitter, Check
 } from 'lucide-react';
 import { Link } from "react-router-dom";
 
@@ -227,10 +227,10 @@ const Features = () => {
 
 const HowItWorks = () => {
   const steps = [
-    { title: "Create Profile", desc: "Connect GitHub, LinkedIn, and your portfolio.", icon: Users },
-    { title: "Complete Challenges", desc: "Prove your skills with domain assessments.", icon: Code2 },
-    { title: "Build Projects", desc: "Upload verifiable work to increase your score.", icon: Briefcase },
-    { title: "Get Hired", desc: "Climb ranks and get offers from top-tier companies.", icon: Star },
+    { title: "Create Profile", desc: "Connect GitHub, LinkedIn, and your portfolio.", icon: Users, bg: "from-blue-500/20 to-transparent", border: "border-blue-500/30" },
+    { title: "Complete Challenges", desc: "Prove your skills with domain assessments.", icon: Code2, bg: "from-purple-500/20 to-transparent", border: "border-purple-500/30" },
+    { title: "Build Projects", desc: "Upload verifiable work to increase your score.", icon: Briefcase, bg: "from-emerald-500/20 to-transparent", border: "border-emerald-500/30" },
+    { title: "Get Hired", desc: "Climb ranks and get offers from top-tier companies.", icon: Star, bg: "from-amber-500/20 to-transparent", border: "border-amber-500/30" },
   ];
 
   return (
@@ -240,18 +240,105 @@ const HowItWorks = () => {
           <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">How It Works</h2>
           <p className="text-slate-400 text-base max-w-xl mx-auto">Your journey from creating a profile to landing your dream role.</p>
         </FadeIn>
-        <div className="grid md:grid-cols-4 gap-10 relative">
+        <div className="grid md:grid-cols-4 gap-8 relative">
           {steps.map((step, i) => (
             <FadeIn key={i} delay={i * 0.1} className="relative z-10 text-center flex flex-col items-center group">
-              <div className="w-14 h-14 rounded-xl bg-[#050b14] border border-white/10 flex items-center justify-center mb-6 shadow-xl relative transition-transform group-hover:scale-105">
-                <div className="absolute inset-0 bg-blue-500/10 blur-xl rounded-full" />
-                <step.icon size={22} className="text-white relative z-10" />
-                <div className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-blue-600 text-white text-[10px] font-bold flex items-center justify-center border-2 border-[#050b14]">
-                  {i + 1}
+              <div className={`p-8 rounded-2xl bg-gradient-to-br ${step.bg} border ${step.border} backdrop-blur-xl transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl`}>
+                <div className="w-14 h-14 rounded-xl bg-[#050b14] border border-white/10 flex items-center justify-center mb-6 mx-auto shadow-xl relative transition-transform group-hover:scale-105">
+                  <div className="absolute inset-0 bg-blue-500/10 blur-xl rounded-full" />
+                  <step.icon size={22} className="text-white relative z-10" />
+                  <div className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-blue-600 text-white text-[10px] font-bold flex items-center justify-center border-2 border-[#050b14]">
+                    {i + 1}
+                  </div>
                 </div>
+                <h4 className="text-base font-bold text-white mb-2">{step.title}</h4>
+                <p className="text-slate-400 text-xs leading-relaxed">{step.desc}</p>
               </div>
-              <h4 className="text-base font-bold text-white mb-2">{step.title}</h4>
-              <p className="text-slate-500 text-xs leading-relaxed px-2">{step.desc}</p>
+            </FadeIn>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+};
+
+const Pricing = () => {
+  const plans = [
+    {
+      name: "Starter",
+      price: "Free",
+      desc: "For aspiring talent starting out.",
+      features: ["Public Skill Profile", "3 Challenges / month", "Standard Resume Analysis"],
+      button: "Start Free",
+      highlight: false
+    },
+    {
+      name: "Professional",
+      price: "$29",
+      period: "/mo",
+      desc: "Accelerate your career with AI.",
+      features: ["Unlimited Challenges", "AI Interview Simulator", "Priority Verification", "Skill Roadmaps"],
+      button: "Go Pro",
+      highlight: true
+    },
+    {
+      name: "Enterprise",
+      price: "Custom",
+      desc: "For high-growth engineering teams.",
+      features: ["Talent Pipeline", "Custom Assessments", "Diversity Analytics", "API Access"],
+      button: "Contact Sales",
+      highlight: false
+    }
+  ];
+
+  return (
+    <section id="pricing" className="py-20 px-6 relative overflow-hidden">
+      <div className="max-w-6xl mx-auto relative z-10">
+        <FadeIn className="text-center mb-12">
+          <h2 className="text-xs font-bold text-blue-500 tracking-widest uppercase mb-4">Pricing Plans</h2>
+          <h3 className="text-3xl md:text-4xl font-bold text-white mb-4">Invest in Your Future.</h3>
+        </FadeIn>
+        
+        <div className="grid lg:grid-cols-3 gap-6">
+          {plans.map((plan, i) => (
+            <FadeIn key={i} delay={i * 0.1}>
+              <div className={`relative h-full p-6 rounded-2xl border transition-all duration-500 ${
+                plan.highlight 
+                  ? 'bg-blue-600/10 border-blue-500/40 shadow-lg' 
+                  : 'bg-white/[0.02] border-white/10'
+              }`}>
+                {plan.highlight && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full">
+                    Most Popular
+                  </div>
+                )}
+                
+                <div className="mb-6">
+                  <h4 className="text-lg font-bold text-white mb-1">{plan.name}</h4>
+                  <div className="flex items-baseline gap-1 mb-2">
+                    <span className="text-3xl font-extrabold text-white">{plan.price}</span>
+                    {plan.period && <span className="text-slate-500 text-sm">{plan.period}</span>}
+                  </div>
+                  <p className="text-slate-500 text-xs leading-relaxed">{plan.desc}</p>
+                </div>
+
+                <ul className="space-y-3 mb-8">
+                  {plan.features.map((feature, idx) => (
+                    <li key={idx} className="flex items-start gap-2 text-slate-300 text-xs">
+                      <Check size={14} className="text-blue-500 mt-0.5" />
+                      {feature}
+                    </li>
+                  ))}
+                </ul>
+
+                <button className={`w-full py-3 rounded-lg font-bold text-xs transition-all ${
+                  plan.highlight 
+                    ? 'bg-blue-600 hover:bg-blue-500 text-white' 
+                    : 'bg-white/5 hover:bg-white/10 text-white border border-white/10'
+                }`}>
+                  {plan.button}
+                </button>
+              </div>
             </FadeIn>
           ))}
         </div>
@@ -272,7 +359,6 @@ const CTA = () => (
             <Link to="/login">
               <button className="w-full sm:w-auto bg-white text-blue-900 hover:bg-blue-50 font-bold px-6 py-2.5 rounded-lg text-sm transition-all shadow-xl">Sign Up Free</button>
             </Link>
-            <button className="w-full sm:w-auto bg-white/5 hover:bg-white/10 text-white border border-white/20 font-bold px-6 py-2.5 rounded-lg text-sm transition-all">Explore Talent</button>
           </div>
         </FadeIn>
       </div>
@@ -281,11 +367,11 @@ const CTA = () => (
 );
 
 const Footer = () => {
-  const platformLinks = [
-    { name: "Resume Analyzer", link: "#" },
-    { name: "Skill Roadmaps", link: "#" },
-    { name: "Interview Simulator", link: "#" }
-  ];
+ const platformLinks = [
+  { name: "Resume Analyzer", link: "/platform#resume" },
+  { name: "Skill Roadmap", link: "/platform#roadmap" },
+  { name: "Interview Simulator", link: "/platform#interview" }
+];
 
  const aboutLinks = [
   { name: "About Us", link: "/about#aboutus" },
@@ -311,9 +397,9 @@ const Footer = () => {
         <ul className="space-y-3 text-sm text-slate-400">
   {platformLinks.map((item) => (
     <li key={item.name}>
-      <a href={item.link} className="hover:text-blue-400 transition-colors">
+      <Link to={item.link} className="hover:text-blue-400 transition-colors">
         {item.name}
-      </a>
+      </Link>
     </li>
   ))}
 </ul>
@@ -356,7 +442,7 @@ const Footer = () => {
               href="https://instagram.com"
               target="_blank"
               rel="noopener noreferrer"
-              className="w-9 h-9 rounded-lg bg-white/5 flex items-center justify-center text-slate-400 hover:text-pink-400 hover:bg-white/10 transition-all"
+              className="w-9 h-9 rounded-lg bg-white/5 flex items-center justify-center text-slate-400 hover: pink-400 hover:bg-white/10 transition-all"
             >
               <Instagram size={18} />
             </a>
@@ -387,7 +473,6 @@ const Footer = () => {
   );
 };
 
-
 export default function ElevateLandingPage() {
   return (
     <div className="min-h-screen bg-[#050b14] text-slate-200 font-sans selection:bg-blue-500/30 selection:text-blue-200">
@@ -396,6 +481,7 @@ export default function ElevateLandingPage() {
       <Stats />
       <Features />
       <HowItWorks />
+      <Pricing />
       <CTA />
       <Footer />
     </div>
