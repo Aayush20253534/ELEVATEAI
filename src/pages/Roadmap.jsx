@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
+import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Map, Zap, Brain, CheckCircle2, Sparkles, TrendingUp, 
-  ChevronDown, BookOpen, Clock, BarChart3, Target, Award,
-  Download, ExternalLink, Info
+  ChevronDown, BookOpen, Clock, Download, ExternalLink, Info 
 } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
@@ -45,16 +46,36 @@ const INITIAL_DATA = [
   }
 ];
 
+const ROLE_SKILLS = {
+  "AI Engineer": ["Python", "PyTorch", "Transformers", "MLOps", "Deep Learning"],
+  "Backend Developer": ["Node.js", "Databases", "API Design", "Docker", "System Design"],
+  "Data Scientist": ["Python", "Statistics", "Machine Learning", "Pandas", "SQL"],
+  "DevOps Engineer": ["Docker", "Kubernetes", "CI/CD", "AWS", "Linux"]
+};
+
 const SkillRoadmap = () => {
   const [loading, setLoading] = useState(false);
   const [showRoadmap, setShowRoadmap] = useState(false);
   const [showInsights, setShowInsights] = useState(false);
   const [role, setRole] = useState("AI Engineer");
   const [roadmapData, setRoadmapData] = useState([]);
+  const [user, setUser] = useState(null);
   const roadmapRef = useRef(null);
+  const navigate = useNavigate();
 
-  // Persistence: Load from Cache
   useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      navigate("/login");
+      return;
+    }
+
+    axios.get("http://127.0.0.1:8000/me", {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then(res => setUser(res.data))
+      .catch(err => console.error(err));
+
     const cachedRoadmap = localStorage.getItem('skill_roadmap_data');
     const cachedVisibility = localStorage.getItem('skill_roadmap_visible');
     
@@ -64,7 +85,7 @@ const SkillRoadmap = () => {
     if (cachedVisibility === 'true') {
       setShowRoadmap(true);
     }
-  }, []);
+  }, [navigate]);
 
   const handleStatusChange = (stageId, skillName, newStatus) => {
     const newData = roadmapData.map(stage => {
@@ -108,6 +129,11 @@ const SkillRoadmap = () => {
     pdf.save(`${role.replace(/\s+/g, '_')}_Roadmap.pdf`);
   };
 
+  const requiredSkills = ROLE_SKILLS[role] || [];
+  const skillGaps = user?.skills
+    ? requiredSkills.filter(skill => !user.skills.includes(skill))
+    : [];
+
   const allSkills = roadmapData.flatMap(s => s.skills);
   const totalCompleted = allSkills.filter(s => s.status === "Completed").length;
   const globalProgress = allSkills.length > 0 ? Math.round((totalCompleted / allSkills.length) * 100) : 0;
@@ -116,10 +142,7 @@ const SkillRoadmap = () => {
     <div className="min-h-screen bg-[#0a0a0c] text-slate-200 flex font-sans">
       <Sidebar />
 
-      <main
-        style={{ marginLeft: "var(--sidebar-width)" }}
-        className="flex-1 flex flex-col overflow-y-auto"
-      >
+      <main style={{ marginLeft: "var(--sidebar-width)" }} className="flex-1 flex flex-col overflow-y-auto">
         <div className="p-8 max-w-7xl mx-auto w-full">
           <header className="mb-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
@@ -144,7 +167,7 @@ const SkillRoadmap = () => {
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Target Role</label>
                 <select 
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm"
                   value={role}
                   onChange={(e) => setRole(e.target.value)}
                 >
@@ -170,11 +193,11 @@ const SkillRoadmap = () => {
                   <option>Cloud Infrastructure</option>
                 </select>
               </div>
-              <button 
+              <button
                 onClick={handleGenerate}
                 className="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-2.5 rounded-lg flex items-center justify-center gap-2 transition-all h-[42px]"
               >
-                {loading ? <div className="h-5 w-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <><Sparkles size={18}/> Generate Roadmap</>}
+                {loading ? <div className="h-5 w-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <><Sparkles size={18} /> Generate Roadmap</>}
               </button>
             </div>
           </section>
@@ -183,7 +206,7 @@ const SkillRoadmap = () => {
             <div className="lg:col-span-8" ref={roadmapRef}>
               <AnimatePresence mode="wait">
                 {showRoadmap ? (
-                  <motion.div 
+                  <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     className="space-y-8"
@@ -229,14 +252,23 @@ const SkillRoadmap = () => {
                         exit={{ height: 0, opacity: 0 }}
                         className="overflow-hidden space-y-3"
                       >
-                        <InsightItem 
-                          title="Skill Gaps" 
-                          desc={totalCompleted < 3 ? "You are just starting. Focus on the Foundations first." : "You're making progress! Keep pushing through Core Skills."}
-                        />
-                        <InsightItem 
-                          title="Job Readiness" 
-                          desc={`Estimated ${Math.max(1, 5 - (totalCompleted/4)).toFixed(1)} months until ready for Junior roles.`}
-                        />
+                        {(!user?.skills || user.skills.length === 0) ? (
+                          <InsightItem
+                            title="Resume Needed"
+                            desc="Upload your resume in the Resume Analyzer to unlock personalized insights."
+                          />
+                        ) : (
+                          <>
+                            <InsightItem
+                              title="Skill Gaps"
+                              desc={skillGaps.length ? `You should focus on learning: ${skillGaps.slice(0, 3).join(", ")}.` : "Your core skillset already aligns well with this role."}
+                            />
+                            <InsightItem
+                              title="Job Readiness"
+                              desc={user.market_readiness === "High" ? "You appear ready for interviews." : user.market_readiness === "Medium" ? "Partially ready. Close a few gaps." : "Significant preparation needed."}
+                            />
+                          </>
+                        )}
                       </motion.div>
                     )}
                   </AnimatePresence>
@@ -244,20 +276,20 @@ const SkillRoadmap = () => {
                   <div className="pt-4 border-t border-slate-800">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-xs font-medium text-slate-400">Total Completion</span>
-                      <span className="text-sm font-bold text-blue-400">{globalProgress}%</span>
+                      <span className="text-sm font-bold text-blue-400">{showRoadmap ? globalProgress : (user?.skills ? Math.min(100, user.skills.length * 10) : 0)}%</span>
                     </div>
                     <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
                       <motion.div 
                         initial={{ width: 0 }}
-                        animate={{ width: `${globalProgress}%` }}
+                        animate={{ width: `${showRoadmap ? globalProgress : (user?.skills ? Math.min(100, user.skills.length * 10) : 0)}%` }}
                         className="h-full bg-blue-500" 
                       />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-3 mt-4">
-                    <StatBox label="Progress" value={`${globalProgress}%`} icon={<TrendingUp size={14}/>} color="text-orange-400" />
-                    <StatBox label="Skills" value={`${totalCompleted}/${allSkills.length}`} icon={<CheckCircle2 size={14}/>} color="text-green-400" />
+                    <StatBox label="Streak" value="12 Days" icon={<TrendingUp size={14}/>} color="text-orange-400" />
+                    <StatBox label="Skills" value={user?.skills ? `${user.skills.length}/24` : "--"} icon={<CheckCircle2 size={14}/>} color="text-green-400" />
                   </div>
                 </div>
               </div>
@@ -273,7 +305,7 @@ const StageCard = ({ stage, index, onStatusChange }) => {
   const [expanded, setExpanded] = useState(index === 0); 
 
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0, x: -20 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ delay: index * 0.1 }}
@@ -282,7 +314,7 @@ const StageCard = ({ stage, index, onStatusChange }) => {
       <div className={`absolute -left-[9px] top-0 h-4 w-4 rounded-full border-2 border-slate-900 transition-colors ${stage.progress === 100 ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.4)]' : 'bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.4)]'}`} />
       
       <div className="bg-slate-900/40 border border-slate-800 rounded-xl overflow-hidden hover:border-slate-700 transition-colors">
-        <div 
+        <div
           className="p-5 cursor-pointer flex items-center justify-between"
           onClick={() => setExpanded(!expanded)}
         >
@@ -292,15 +324,15 @@ const StageCard = ({ stage, index, onStatusChange }) => {
               <h2 className="text-xl font-bold">{stage.title}</h2>
             </div>
             <div className="flex items-center gap-4 text-sm text-slate-400">
-              <span className="flex items-center gap-1"><Clock size={14}/> {stage.duration}</span>
-              <span className="flex items-center gap-1"><BookOpen size={14}/> {stage.skills.length} modules</span>
+              <span className="flex items-center gap-1"><Clock size={14} /> {stage.duration}</span>
+              <span className="flex items-center gap-1"><BookOpen size={14} /> {stage.skills.length} modules</span>
             </div>
           </div>
           <div className="flex items-center gap-4">
             <div className="text-right hidden sm:block">
               <div className="text-[10px] uppercase font-bold text-slate-500 mb-1">Progress</div>
               <div className="w-32 bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                <motion.div 
+                <motion.div
                   initial={{ width: 0 }}
                   animate={{ width: `${stage.progress}%` }}
                   className={`h-full transition-colors ${stage.progress === 100 ? 'bg-emerald-500' : 'bg-blue-500'}`} 
@@ -313,7 +345,7 @@ const StageCard = ({ stage, index, onStatusChange }) => {
 
         <AnimatePresence>
           {expanded && (
-            <motion.div 
+            <motion.div
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
@@ -352,14 +384,20 @@ const SkillCard = ({ skill, onStatusUpdate }) => (
       <span className={`text-[9px] px-2 py-0.5 rounded border uppercase font-bold ${getDiffColor(skill.difficulty)}`}>
         {skill.difficulty}
       </span>
-      <a 
-        href={skill.url} 
-        target="_blank" 
-        rel="noopener noreferrer" 
-        className="text-[10px] text-blue-400 font-bold hover:underline flex items-center gap-1"
-      >
-        DOCS <ExternalLink size={10} />
-      </a>
+      {skill.url ? (
+        <a 
+          href={skill.url} 
+          target="_blank" 
+          rel="noopener noreferrer" 
+          className="text-[10px] text-blue-400 font-bold hover:underline flex items-center gap-1"
+        >
+          DOCS <ExternalLink size={10} />
+        </a>
+      ) : (
+        <span className="flex items-center gap-1 text-slate-500 text-[10px]">
+          <Clock size={10} /> {skill.time}
+        </span>
+      )}
     </div>
   </motion.div>
 );

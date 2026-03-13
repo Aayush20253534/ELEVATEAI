@@ -82,7 +82,7 @@ export default function CareerDashboard() {
         if (err.response?.status === 401) navigate("/login");
       });
   }, [navigate]);
-  
+
   const askAI = async (customPrompt) => {
     const activePrompt = customPrompt || prompt;
     if (!activePrompt.trim()) return;
@@ -198,7 +198,12 @@ export default function CareerDashboard() {
           </section>
 
           <section className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
-            <StatCard icon={TrendingUp} label="Market Readiness" value="High" color="bg-blue-500" />
+            <StatCard
+              icon={TrendingUp}
+              label="Market Readiness"
+              value={user?.market_readiness || "--"}
+              color="bg-blue-500"
+            />
             <StatCard icon={Briefcase} label="Active Applications" value="08" color="bg-purple-500" />
             <StatCard icon={Zap} label="Learning Streak" value="14 Days" color="bg-emerald-500" />
             <StatCard icon={Clock} label="Avg. Response Time" value="2.4d" color="bg-amber-500" />
@@ -252,23 +257,30 @@ export default function CareerDashboard() {
                   <div className="relative w-12 h-12">
                     <div className="absolute inset-0 bg-emerald-500/20 blur-xl rounded-full animate-pulse" />
                     <div className="relative w-full h-full rounded-full border border-emerald-500/30 flex items-center justify-center bg-[#0a121e]">
-                       <CheckCircle2 size={20} className="text-emerald-400" />
+                      <CheckCircle2 size={20} className="text-emerald-400" />
                     </div>
                   </div>
                 </div>
-
                 <div className="w-full space-y-4">
-                  {[
-                    { name: 'React/Next.js', color: 'text-cyan-400', bg: 'bg-cyan-400/10', border: 'border-cyan-400/20', level: 'Expert' },
-                    { name: 'TypeScript', color: 'text-blue-400', bg: 'bg-blue-400/10', border: 'border-blue-400/20', level: 'Advanced' },
-                    { name: 'Node.js', color: 'text-emerald-400', bg: 'bg-emerald-400/10', border: 'border-emerald-400/20', level: 'Intermediate' },
-                    { name: 'System Design', color: 'text-purple-400', bg: 'bg-purple-400/10', border: 'border-purple-400/20', level: 'Advanced' },
-                  ].map((skill) => (
-                    <div key={skill.name} className={`flex justify-between items-center p-4 ${skill.bg} border ${skill.border} rounded-2xl backdrop-blur-sm transition-transform hover:scale-[1.02]`}>
-                      <span className="text-[11px] font-bold text-white uppercase tracking-wider">{skill.name}</span>
-                      <span className={`text-[10px] font-black uppercase tracking-tighter ${skill.color}`}>{skill.level}</span>
+                  {(!user?.skills || user.skills.length === 0) ? (
+                    <div className="text-center text-slate-400 text-sm py-8">
+                      Upload a resume to generate your skill breakdown
                     </div>
-                  ))}
+                  ) : (
+                    user.skills.map((skill, index) => (
+                      <div
+                        key={index}
+                        className="flex justify-between items-center p-4 bg-cyan-400/10 border border-cyan-400/20 rounded-2xl backdrop-blur-sm transition-transform hover:scale-[1.02]"
+                      >
+                        <span className="text-[11px] font-bold text-white uppercase tracking-wider">
+                          {skill}
+                        </span>
+                        <span className="text-[10px] font-black uppercase tracking-tighter text-cyan-400">
+                          detected
+                        </span>
+                      </div>
+                    ))
+                  )}
                 </div>
 
                 <button className="mt-8 w-full py-4 bg-white text-[#050b14] hover:bg-emerald-400 transition-colors rounded-2xl font-bold text-sm shadow-xl shadow-emerald-500/10">
@@ -342,14 +354,18 @@ export default function CareerDashboard() {
 
               <div className="p-6 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between">
                 <div>
-                   <div className="text-2xl font-bold text-white mb-1">28</div>
-                   <div className="text-xs text-slate-400 font-medium uppercase tracking-wider">Verified Skills</div>
+                  <div className="text-2xl font-bold text-white mb-1">
+                    {user?.skills ? user.skills.length : 0}
+                  </div>
+                  <div className="text-xs text-slate-400 font-medium uppercase tracking-wider">
+                    {user?.skills?.length ? "Verified Skills" : "Upload Resume"}
+                  </div>
                 </div>
                 <div className="p-3 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
-                  <CheckCircle2 size={24} className="text-emerald-400" />
+                  <span className="text-emerald-400"><CheckCircle2 size={24} /></span>
                 </div>
               </div>
-              
+
               <div className="p-5 rounded-2xl bg-amber-500/10 border border-amber-500/20">
                 <div className="flex gap-3">
                   <AlertCircle size={18} className="text-amber-400 shrink-0" />
