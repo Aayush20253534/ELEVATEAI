@@ -66,13 +66,12 @@ const EditableInput = ({ label, value, setValue, icon: Icon, type = "text" }) =>
 };
 
 const StatsPanel = () => {
-  const stats = [
-    { label: 'Courses Done', value: '24', borderColor: 'border-l-amber-500', shadow: 'shadow-amber-500/10' },
-    { label: 'Learning Streak', value: '48', borderColor: 'border-l-purple-500', shadow: 'shadow-purple-500/10' },
-    { label: 'Networks', value: '06', borderColor: 'border-l-emerald-500', shadow: 'shadow-emerald-500/10' },
-    { label: 'Profile Views', value: '1.2k', borderColor: 'border-l-pink-500', shadow: 'shadow-pink-500/10' },
-  ];
-
+const stats = [
+  { label: 'Projects Built', value: '07', borderColor: 'border-l-amber-500', shadow: 'shadow-amber-500/10' },
+  { label: 'Modules Completed', value: '21', borderColor: 'border-l-purple-500', shadow: 'shadow-purple-500/10' },
+  { label: 'Skills Mastered', value: '18', borderColor: 'border-l-emerald-500', shadow: 'shadow-emerald-500/10' },
+  { label: 'Certifications', value: '03', borderColor: 'border-l-pink-500', shadow: 'shadow-pink-500/10' },
+];
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
       {stats.map((stat, i) => (
@@ -93,74 +92,37 @@ const StatsPanel = () => {
 
 
 
-const DynamicProfessionalLinks = () => {
-  const [links, setLinks] = useState([
-    { id: 1, platform: 'LinkedIn', url: 'linkedin.com/in/user' },
-    { id: 2, platform: 'Portfolio', url: 'my-work.com' }
-  ]);
+const ProfessionalLinks = ({ links, setLinks }) => {
 
-  const addLink = () => {
-    setLinks([...links, { id: Date.now(), platform: '', url: '' }]);
-  };
-
-  const removeLink = (id) => {
-    setLinks(links.filter(link => link.id !== id));
-  };
-
-  const updateLink = (id, field, value) => {
-    setLinks(links.map(link => link.id === id ? { ...link, [field]: value } : link));
+  const updateLink = (platform, value) => {
+    const updated = { ...links, [platform]: value };
+    setLinks(updated);
   };
 
   return (
     <GlassCard>
-      <div className="flex justify-between items-center mb-6">
-        <SectionHeader icon={Globe} title="Professional Links" />
-        <button
-          onClick={addLink}
-          className="p-1.5 bg-blue-500/10 hover:bg-blue-500/20 rounded-lg text-blue-400 transition-colors"
-        >
-          <Plus size={18} />
-        </button>
-      </div>
+      <SectionHeader icon={Globe} title="Professional Links" />
 
       <div className="space-y-4">
-        <AnimatePresence>
-          {links.map((link) => (
-            <motion.div
-              key={link.id}
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="group bg-black/20 border border-white/5 rounded-xl p-3 relative"
-            >
-              <div className="flex items-center justify-between mb-1">
-                <input
-                  value={link.platform}
-                  onChange={(e) => updateLink(link.id, 'platform', e.target.value)}
-                  placeholder="Platform (e.g. Behance, Github)"
-                  className="bg-transparent text-[10px] font-bold text-blue-400 uppercase tracking-widest focus:outline-none w-full"
-                />
-                <button
-                  onClick={() => removeLink(link.id)}
-                  className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 transition-all"
-                >
-                  <Trash2 size={14} />
-                </button>
-              </div>
-              <input
-                value={link.url}
-                onChange={(e) => updateLink(link.id, 'url', e.target.value)}
-                placeholder="https://..."
-                className="bg-transparent text-sm text-gray-300 w-full focus:outline-none"
-              />
-            </motion.div>
-          ))}
-        </AnimatePresence>
+
+        <EditableInput
+  label="LinkedIn"
+  value={links.linkedin || ""}
+  setValue={(val) => updateLink("linkedin", val)}
+  icon={Linkedin}
+/>
+
+        <EditableInput
+  label="Portfolio"
+  value={links.portfolio || ""}
+  setValue={(val) => updateLink("portfolio", val)}
+  icon={Globe}
+/>
+
       </div>
     </GlassCard>
   );
 };
-
 // --- MAIN PAGE ---
 
 const ProfilePage = () => {
@@ -178,23 +140,29 @@ const ProfilePage = () => {
   const [bio, setBio] = useState("");
   const [current_role, setCurrentRole] = useState("");
   const [target_role, setTargetRole] = useState("");
-  const [links, setLinks] = useState([]);
+  const [links, setLinks] = useState({
+  linkedin: "",
+  portfolio: ""
+});
+  const [resume, setResume] = useState(null);
+  const resumeInputRef = useRef(null);
 
   const saveProfile = async () => {
     const token = localStorage.getItem("token");
 
     try {
-      await axios.post(
-        "http://127.0.0.1:8000/profile/update",
-        {
-          name,
-          username,
-          phone,
-          bio,
-          current_role,
-          target_role,
-          professional_links: links
-        },
+     await axios.post(
+  "http://127.0.0.1:8000/profile/update",
+  {
+    name,
+    username,
+    phone,
+    bio,
+    current_role,
+    target_role,
+    resume,
+    professional_links: links
+  },
         {
           headers: { Authorization: `Bearer ${token}` }
         }
@@ -229,10 +197,36 @@ const ProfilePage = () => {
 
         setImage(res.data.profile_image || null);
         setCoverImage(res.data.cover_image || null);
+        setResume(res.data.resume || null);
       })
       .catch(err => console.log(err));
   }, []);
 
+const uploadResume = async (file) => {
+  const token = localStorage.getItem("token");
+
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const res = await axios.post(
+    "http://127.0.0.1:8000/profile/upload-resume",
+    formData,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "multipart/form-data"
+      }
+    }
+  );
+
+  setResume(res.data.resume);
+};
+const handleResumeChange = (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  uploadResume(file);
+};
   const uploadProfile = async (file) => {
     const token = localStorage.getItem("token");
 
@@ -366,7 +360,13 @@ setCoverImage(res.data.cover_image)
                     setValue={setUsername}
                     icon={User}
                   />
-                  <EditableInput label="Email Address" value={user?.email} icon={Mail} type="email" />
+                  <EditableInput
+  label="Email Address"
+  value={user?.email || ""}
+  setValue={() => {}}
+  icon={Mail}
+  type="email"
+/>
                   <EditableInput
                     label="Phone Number"
                     value={phone}
@@ -387,18 +387,45 @@ setCoverImage(res.data.cover_image)
               <GlassCard>
                 <SectionHeader icon={Briefcase} title="Career Profile" />
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 mb-6">
-                  <EditableInput label="Current Role" value="Senior Specialist" icon={Briefcase} />
-                  <EditableInput label="Target Role" value="Lead Director" icon={Target} />
+                  <EditableInput
+  label="Current Role"
+  value={current_role}
+  setValue={setCurrentRole}
+  icon={Briefcase}
+/>
+
+<EditableInput
+  label="Target Role"
+  value={target_role}
+  setValue={setTargetRole}
+  icon={Target}
+/>
                 </div>
-                <div className="p-6 border-2 border-dashed border-white/10 rounded-2xl hover:border-blue-500/30 transition-colors group cursor-pointer text-center">
-                  <UploadCloud className="w-8 h-8 mx-auto text-gray-500 group-hover:text-blue-400 mb-2 transition-colors" />
-                  <p className="text-sm text-gray-400">Upload your latest Resume/Portfolio <span className="text-blue-400">browse</span></p>
-                </div>
+               <div
+  onClick={() => resumeInputRef.current?.click()}
+  className="p-6 border-2 border-dashed border-white/10 rounded-2xl hover:border-blue-500/30 transition-colors group cursor-pointer text-center"
+>
+  <UploadCloud className="w-8 h-8 mx-auto text-gray-500 group-hover:text-blue-400 mb-2 transition-colors" />
+
+  <p className="text-sm text-gray-400">
+  {resume ? `Uploaded: ${resume.split('/').pop()}` : "Upload your latest Resume"}
+</p>
+
+  <span className="text-blue-400 text-sm">Browse File</span>
+
+  <input
+    ref={resumeInputRef}
+    type="file"
+    className="hidden"
+    accept=".pdf,.doc,.docx"
+    onChange={handleResumeChange}
+  />
+</div>
               </GlassCard>
             </div>
 
             <div className="lg:col-span-4 space-y-6">
-              <DynamicProfessionalLinks />
+              <ProfessionalLinks links={links} setLinks={setLinks} />
 
               <GlassCard>
                 <SectionHeader icon={Shield} title="Security & Settings" />
@@ -418,12 +445,14 @@ setCoverImage(res.data.cover_image)
           </div>
         </div>
       </main>
-      <button
-        onClick={saveProfile}
-        className="mt-6 w-full py-3 bg-blue-600 hover:bg-blue-500 rounded-xl text-white font-semibold"
-      >
-        Save Profile
-      </button>
+      <div className="fixed bottom-8 right-8">
+<button
+  onClick={saveProfile}
+  className="px-6 py-3 bg-blue-600 hover:bg-blue-500 rounded-xl text-white font-semibold shadow-lg"
+>
+Save Changes
+</button>
+</div>
 
       <style>{`
         ::-webkit-scrollbar { width: 8px; }
