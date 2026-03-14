@@ -104,6 +104,54 @@ const SkillRoadmap = () => {
 
     setRoadmapData(newData);
     localStorage.setItem('skill_roadmap_data', JSON.stringify(newData));
+    const token = localStorage.getItem("token");
+
+    axios.post(
+      "http://127.0.0.1:8000/roadmap/save",
+      { roadmap: newData },
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+  };
+
+  const parseLearningTime = (timeStr) => {
+    if (!timeStr) return 0;
+
+    const lower = timeStr.toLowerCase();
+
+    // range like 2-3h
+    if (lower.includes("-")) {
+      const parts = lower.split("-");
+      const first = parseFloat(parts[0]);
+      const second = parseFloat(parts[1]);
+      if (!isNaN(first) && !isNaN(second)) {
+        return (first + second) / 2;
+      }
+    }
+
+    // minutes
+    if (lower.includes("min")) {
+      const num = parseFloat(lower);
+      return num / 60;
+    }
+
+    // days
+    if (lower.includes("day")) {
+      const num = parseFloat(lower);
+      return num * 6; // assume 6h/day
+    }
+
+    // hours
+    const num = parseFloat(lower);
+    return isNaN(num) ? 0 : num;
+  };
+
+  const calculateWeeks = (concepts) => {
+    const totalHours = concepts.reduce((sum, c) => {
+      return sum + parseLearningTime(c.learning_time);
+    }, 0);
+
+    const weeks = Math.ceil(totalHours / 10);
+    return `${weeks} Weeks`;
   };
 
   const handleGenerate = async () => {
@@ -117,11 +165,11 @@ const SkillRoadmap = () => {
 
     try {
       const res = await axios.post("http://127.0.0.1:8000/roadmap", {
-                    topic: role,
-                    experience_level: experience,
-                    learning_style: learningStyle,
-                    limit: 5
-                  });
+        topic: role,
+        experience_level: experience,
+        learning_style: learningStyle,
+        limit: 5
+      });
 
       const data = res.data;
 
@@ -129,41 +177,41 @@ const SkillRoadmap = () => {
         {
           id: 1,
           title: "Foundations",
-          duration: "4 Weeks",
+          duration: calculateWeeks(data.basic),
           progress: 0,
           skills: data.basic.map(c => ({
-  name: c.title,
-  difficulty: c.toughness,
-  time: c.learning_time,
-  status: "Not Started",
-  url: c.learning_link
-}))
+            name: c.title,
+            difficulty: c.toughness,
+            time: c.learning_time,
+            status: "Not Started",
+            url: c.learning_link
+          }))
         },
         {
           id: 2,
           title: "Core Skills",
-          duration: "8 Weeks",
+          duration: calculateWeeks(data.core),
           progress: 0,
           skills: data.core.map(c => ({
-  name: c.title,
-  difficulty: c.toughness,
-  time: c.learning_time,
-  status: "Not Started",
-  url: c.learning_link
-}))
+            name: c.title,
+            difficulty: c.toughness,
+            time: c.learning_time,
+            status: "Not Started",
+            url: c.learning_link
+          }))
         },
         {
           id: 3,
           title: "Advanced Topics",
-          duration: "6 Weeks",
+          duration: calculateWeeks(data.advanced),
           progress: 0,
           skills: data.advanced.map(c => ({
-  name: c.title,
-  difficulty: c.toughness,
-  time: c.learning_time,
-  status: "Not Started",
-  url: c.learning_link
-}))
+            name: c.title,
+            difficulty: c.toughness,
+            time: c.learning_time,
+            status: "Not Started",
+            url: c.learning_link
+          }))
         }
       ];
 
@@ -245,10 +293,10 @@ const SkillRoadmap = () => {
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Experience</label>
                 <select
-  value={experience}
-  onChange={(e) => setExperience(e.target.value)}
-  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none text-sm"
->
+                  value={experience}
+                  onChange={(e) => setExperience(e.target.value)}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                >
                   <option>Beginner</option>
                   <option>Intermediate</option>
                   <option>Advanced</option>
@@ -257,10 +305,10 @@ const SkillRoadmap = () => {
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Domain Focus</label>
                 <select
-  value={learningStyle}
-  onChange={(e) => setLearningStyle(e.target.value)}
-  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none text-sm"
->
+                  value={learningStyle}
+                  onChange={(e) => setLearningStyle(e.target.value)}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                >
                   <option>Project Based</option>
                   <option>Theory First</option>
                   <option>Balanced</option>
@@ -364,12 +412,12 @@ const SkillRoadmap = () => {
 
                   <div className="grid grid-cols-2 gap-3 mt-4">
                     <StatBox label="Streak" value="12 Days" icon={<TrendingUp size={14} />} color="text-orange-400" />
-                    <StatBox 
-  label="Skills"
-  value={`${totalCompleted}/${allSkills.length}`}
-  icon={<CheckCircle2 size={14} />}
-  color="text-green-400"
-/>
+                    <StatBox
+                      label="Skills"
+                      value={`${totalCompleted}/${allSkills.length}`}
+                      icon={<CheckCircle2 size={14} />}
+                      color="text-green-400"
+                    />
                   </div>
                 </div>
               </div>
@@ -460,24 +508,27 @@ const SkillCard = ({ skill, onStatusUpdate }) => (
         onChange={onStatusUpdate}
       />
     </div>
-    <div className="flex items-center justify-between">
-      <span className={`text-[9px] px-2 py-0.5 rounded border uppercase font-bold ${getDiffColor(skill.difficulty)}`}>
+    <div className="flex items-center justify-between text-[10px] text-slate-400">
+
+      <span className={`px-2 py-0.5 rounded border uppercase font-bold ${getDiffColor(skill.difficulty)}`}>
         {skill.difficulty}
       </span>
-      {skill.url ? (
+
+      <span className="flex items-center gap-1">
+        <Clock size={10} /> {skill.time}
+      </span>
+
+      {skill.url && (
         <a
           href={skill.url}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-[10px] text-blue-400 font-bold hover:underline flex items-center gap-1"
+          className="text-blue-400 font-bold hover:underline flex items-center gap-1"
         >
-          DOCS <ExternalLink size={10} />
+          Docs <ExternalLink size={10} />
         </a>
-      ) : (
-        <span className="flex items-center gap-1 text-slate-500 text-[10px]">
-          <Clock size={10} /> {skill.time}
-        </span>
       )}
+
     </div>
   </motion.div>
 );

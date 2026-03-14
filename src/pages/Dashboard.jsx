@@ -62,6 +62,7 @@ export default function CareerDashboard() {
   ]);
   const [loadingAI, setLoadingAI] = useState(false);
   const navigate = useNavigate();
+  const milestone = user?.next_milestone;
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -214,17 +215,20 @@ export default function CareerDashboard() {
                 </h3>
                 <div className="space-y-6">
                   <div>
-                    <div className="flex justify-between items-end mb-2">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">AWS Cloud Practitioner</span>
-                      <span className="text-sm font-bold text-blue-400">65%</span>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                      {milestone?.stage || "No Roadmap"}
+                    </span>
+
+                    <div className="p-3 bg-white/5 rounded-xl border border-white/5 text-[11px] text-slate-400">
+                      Complete <span className="text-blue-400 font-medium">
+                        {milestone?.skill || "Generate a roadmap"}
+                      </span> to progress your roadmap.
                     </div>
                     <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
                       <motion.div initial={{ width: 0 }} animate={{ width: '65%' }} transition={{ duration: 1.5 }} className="h-full bg-blue-500 rounded-full" />
                     </div>
                   </div>
-                  <div className="p-3 bg-white/5 rounded-xl border border-white/5 text-[11px] text-slate-400">
-                    Complete <span className="text-blue-400 font-medium">EC2 Fundamentals</span> to reach 80% readiness.
-                  </div>
+                  
                 </div>
               </div>
 
