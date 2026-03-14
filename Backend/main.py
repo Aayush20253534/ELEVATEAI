@@ -34,7 +34,7 @@ app.mount("/resume-files", StaticFiles(directory="resume"), name="resume-files")
 load_dotenv()
 
 llm = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash-lite",
+    model="gemini-2.5-flash",
     api_key=os.getenv("GOOGLE_API_KEY"),
     temperature=0
 )
@@ -51,12 +51,12 @@ class WeakLineFeedback(BaseModel):
 
 class MarketReadiness(BaseModel):
     score:int = Field(description="Percentage Readiness of User")
-    market_readiness:Literal['Very weak resume','Early stage candidate','Moderate readiness','Strong candidate','Highly competitive candidate'] = Field(description="User's Overall Job Market Readiness")
+    market_readiness:Literal['Low', 'Medium', 'High'] = Field(description="User's Overall Job Market Readiness")
     key_strengths: List[str] = Field(description="Top professional strengths found")
     critical_gaps: List[str] = Field(description="Major missing qualifications")
     missing_keywords: List[str] = Field(description="Specific technical terms missing")
     weakest_line: WeakLineFeedback = Field(
-        description="Weakest resume line along with improved AI suggestions"
+        description="Weakest resume line along with improved AI suggestions for the target job."
     )
     skills: List[str] = Field(description="List of skills found in Resume")
     projects: List[str] = Field(description="List of projects found in resume")
@@ -157,6 +157,8 @@ The improved version must:
 * be more specific
 * include measurable impact when possible
 * sound professional and achievement-oriented
+* be oriented towards the target job of the person
+* change the statement to match the persons target goal
 
 7. Skills
    Extract the skills explicitly mentioned in the resume.
@@ -187,6 +189,7 @@ You will be provided with the user's resume content. Analyze it and produce the 
     )
 
     result = structured_llm.invoke([message])
+    print(f"DEBUG AI RESPONSE: {result}")
     return result.model_dump()
 
 # ---------------- CORS ---------------- #
@@ -616,19 +619,6 @@ async def analyze_uploaded_resume(
 
         # run AI resume analysis
         report = await analyze_resume(contents, target_job)
-        def ensure_list(v):
-            if isinstance(v, list):
-                return v
-            if v is None:
-                return []
-            return [v]
-
-        report["key_strengths"] = ensure_list(report.get("key_strengths"))
-        report["critical_gaps"] = ensure_list(report.get("critical_gaps"))
-        report["missing_keywords"] = ensure_list(report.get("missing_keywords"))
-        report["skills"] = ensure_list(report.get("skills"))
-        report["projects"] = ensure_list(report.get("projects"))
-        report["certifications"] = ensure_list(report.get("certifications"))
 
 
         conn = get_db()
@@ -658,7 +648,7 @@ async def analyze_uploaded_resume(
         return {
             "filename": unique_name,
             "file_path": file_path,
-            "ats_score": report["score"],
+            "ats_score": report['score'],
             "market_readiness": report["market_readiness"],
             "strengths": report["key_strengths"],
             "weaknesses": report["critical_gaps"],
@@ -666,6 +656,7 @@ async def analyze_uploaded_resume(
             "suggestions": report["weakest_line"]["improved_version"],
             "weak_line": report["weakest_line"]["weak_line"]
         }
+
     except Exception as e:
         print(e)
         raise HTTPException(status_code=500, detail=str(e))
