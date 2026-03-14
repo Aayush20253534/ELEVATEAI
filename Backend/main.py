@@ -155,7 +155,8 @@ def init_db():
     skills TEXT,
     projects TEXT,
     certifications TEXT,
-    resume TEXT
+    resume TEXT,
+    roadmap TEXT
 )
     """)
 
@@ -196,6 +197,10 @@ class JobSearchRequest(BaseModel):
 class ChatRequest(BaseModel):
     message: str
 
+class SaveRoadmap(BaseModel):
+    roadmap: list
+
+
 # ---------------- PASSWORD UTILS ---------------- #
 
 def hash_password(password: str):
@@ -204,6 +209,7 @@ def hash_password(password: str):
 
 def verify_password(password: str, hashed: str):
     return pwd_context.verify(password, hashed)
+
 
 
 # ---------------- JWT UTILS ---------------- #
@@ -356,6 +362,9 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
 
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+        
+    roadmap = json.loads(user["roadmap"]) if user["roadmap"] else []
+    milestone = get_next_milestone(roadmap)
 
     return {
         "name": user["name"],
@@ -373,9 +382,10 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
         "market_readiness": user["market_readiness"],
         "skills": json.loads(user["skills"]) if user["skills"] else [],
         "projects": json.loads(user["projects"]) if user["projects"] else [],
-        "certifications": json.loads(user["certifications"]) if user["certifications"] else []
+        "certifications": json.loads(user["certifications"]) if user["certifications"] else [],
+        "roadmap": roadmap,
+        "next_milestone": milestone
     }
-
 
 @app.post("/profile/update")
 def update_profile(
@@ -658,6 +668,42 @@ def start_interview(data: InterviewStart):
     return {
         "question": question
     }
+
+@app.post("/roadmap/save")
+def save_roadmap(
+    data: SaveRoadmap,
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+
+    email = verify_token(credentials.credentials)
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "UPDATE users SET roadmap=? WHERE email=?",
+        (json.dumps(data.roadmap), email)
+    )
+
+    conn.commit()
+    conn.close()
+
+    return {"message": "Roadmap saved"}
+
+def get_next_milestone(roadmap):
+
+    if not roadmap:
+        return None
+
+    for stage in roadmap:
+        for skill in stage["skills"]:
+            if skill["status"] != "Completed":
+                return {
+                    "stage": stage["title"],
+                    "skill": skill["name"]
+                }
+
+    return None
 
 @app.post("/profile/upload-resume")
 async def upload_resume(
