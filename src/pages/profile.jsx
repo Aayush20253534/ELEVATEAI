@@ -43,7 +43,14 @@ const EditableInput = ({ label, value, setValue, icon: Icon, type = "text", disa
         <input
           disabled={!isEditing || disabled}
           value={value}
-          onChange={(e) => setValue(e.target.value)}
+          onChange={(e) => {
+  if (type === "tel") {
+    const onlyNums = e.target.value.replace(/\D/g, "");
+    setValue(onlyNums);
+  } else {
+    setValue(e.target.value);
+  }
+}}
           type={type}
           className={`w-full bg-black/20 border ${isEditing ? 'border-blue-500/50' : 'border-white/5'
             } rounded-xl py-2.5 pl-10 pr-12 text-gray-200 disabled:opacity-50`}
@@ -344,7 +351,13 @@ const ProfilePage = () => {
                   <EditableInput label="Full Name" value={name} setValue={setName} icon={User} />
                   <EditableInput label="Username" value={username} setValue={setUsername} icon={User} />
                   <EditableInput label="Email Address" value={user?.email || ""} icon={Mail} type="email" disabled={true} />
-                  <EditableInput label="Phone Number" value={phone} setValue={setPhone} icon={Phone} />
+                  <EditableInput
+  label="Phone Number"
+  value={phone}
+  setValue={setPhone}
+  icon={Phone}
+  type="tel"
+/>
                 </div>
                 <div className="mt-2">
                   <label className="text-xs font-medium text-gray-400 mb-1.5 block ml-1">Bio / About Me</label>
@@ -363,16 +376,63 @@ const ProfilePage = () => {
                   <EditableInput label="Target Role" value={target_role} setValue={setTargetRole} icon={Target} />
                 </div>
                 <div
-                  onClick={() => resumeInputRef.current?.click()}
-                  className="p-6 border-2 border-dashed border-white/10 rounded-2xl hover:border-blue-500/30 transition-colors group cursor-pointer text-center"
-                >
-                  <UploadCloud className="w-8 h-8 mx-auto text-gray-500 group-hover:text-blue-400 mb-2 transition-colors" />
-                  <p className="text-sm text-gray-400">
-                    {resume ? `Uploaded: ${resume.split('/').pop()}` : "Upload your latest Resume"}
-                  </p>
-                  <span className="text-blue-400 text-sm">Browse File</span>
-                  <input ref={resumeInputRef} type="file" className="hidden" accept=".pdf,.doc,.docx" onChange={(e) => handleFileChange(e, 'resume')} />
-                </div>
+  onClick={() => !resume && resumeInputRef.current?.click()}
+  className="p-6 border-2 border-dashed border-white/10 rounded-2xl hover:border-blue-500/30 transition-colors group cursor-pointer text-center"
+>
+
+  <UploadCloud className="w-8 h-8 mx-auto text-gray-500 group-hover:text-blue-400 mb-3 transition-colors" />
+
+  {!resume && (
+    <>
+      <p className="text-sm text-gray-400">
+        Upload your latest Resume
+      </p>
+      <span className="text-blue-400 text-sm">Browse File</span>
+    </>
+  )}
+
+  {resume && (
+    <div className="flex flex-col items-center gap-2">
+
+      <p className="text-sm text-green-400 font-semibold">
+        Uploaded: {resume.split("/").pop()}
+      </p>
+
+      <div className="flex gap-3 mt-2">
+
+        <a
+          href={`${API_BASE}${resume}`}
+          target="_blank"
+          className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs rounded-lg transition"
+        >
+          Download
+        </a>
+
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setResume(null);
+            resumeInputRef.current.click();
+          }}
+          className="px-4 py-1.5 bg-white/10 hover:bg-white/20 text-xs rounded-lg transition"
+        >
+          Replace
+        </button>
+
+      </div>
+
+    </div>
+  )}
+
+  <input
+    ref={resumeInputRef}
+    type="file"
+    className="hidden"
+    accept=".pdf,.doc,.docx"
+    onChange={(e) => handleFileChange(e, "resume")}
+  />
+
+</div>
               </GlassCard>
             </div>
 

@@ -10,7 +10,7 @@ import Interview from "./pages/Interview";
 import FindJobs from "./pages/Find_jobs";
 import ResumeBuilder from "./pages/ResumeBuilder";
 import SkillRoadmap from "./pages/Roadmap";
-import ProfilePage from "./pages/profile";
+import ProfilePage from "./pages/Profile";
 import LeaderboardPage from "./pages/leaderboard";
 import AboutPage from "./components/About";
 import LegalPage from "./components/Policy";
