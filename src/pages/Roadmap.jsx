@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate,useLocation} from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Map, Zap, Brain, CheckCircle2, Sparkles, TrendingUp,
@@ -62,6 +62,8 @@ const SkillRoadmap = () => {
   const [user, setUser] = useState(null);
   const roadmapRef = useRef(null);
   const navigate = useNavigate();
+  const location = useLocation();
+  const highlightSkill = location.state?.highlightSkill;
   const [experience, setExperience] = useState("Beginner");
   const [learningStyle, setLearningStyle] = useState("Project Based");
 
@@ -334,14 +336,15 @@ const SkillRoadmap = () => {
                     animate={{ opacity: 1, y: 0 }}
                     className="space-y-8"
                   >
-                    {roadmapData.map((stage, index) => (
-                      <StageCard
-                        key={stage.id}
-                        stage={stage}
-                        index={index}
-                        onStatusChange={handleStatusChange}
-                      />
-                    ))}
+                   {roadmapData.map((stage, index) => (
+  <StageCard
+    key={stage.id}
+    stage={stage}
+    index={index}
+    highlightSkill={highlightSkill}
+    onStatusChange={handleStatusChange}
+  />
+))}
                   </motion.div>
                 ) : (
                   <div className="h-64 flex flex-col items-center justify-center border-2 border-dashed border-slate-800 rounded-2xl text-slate-500">
@@ -429,7 +432,7 @@ const SkillRoadmap = () => {
   );
 };
 
-const StageCard = ({ stage, index, onStatusChange }) => {
+const StageCard = ({ stage, index, onStatusChange, highlightSkill }) => {
   const [expanded, setExpanded] = useState(index === 0);
 
   return (
@@ -481,11 +484,12 @@ const StageCard = ({ stage, index, onStatusChange }) => {
             >
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
                 {stage.skills.map((skill, idx) => (
-                  <SkillCard
-                    key={idx}
-                    skill={skill}
-                    onStatusUpdate={(val) => onStatusChange(stage.id, skill.name, val)}
-                  />
+                 <SkillCard
+  key={idx}
+  skill={skill}
+  highlight={highlightSkill === skill.name}
+  onStatusUpdate={(val) => onStatusChange(stage.id, skill.name, val)}
+/>
                 ))}
               </div>
             </motion.div>
@@ -496,10 +500,14 @@ const StageCard = ({ stage, index, onStatusChange }) => {
   );
 };
 
-const SkillCard = ({ skill, onStatusUpdate }) => (
-  <motion.div
+const SkillCard = ({ skill, onStatusUpdate, highlight }) => (<motion.div
     whileHover={{ y: -2 }}
-    className="bg-slate-800/40 p-4 rounded-xl border border-slate-700/50 group hover:bg-slate-800/60 transition-colors"
+className={`p-4 rounded-xl border group transition-colors
+${
+  highlight
+    ? "bg-red-500/10 border-red-400 shadow-[0_0_12px_rgba(239,68,68,0.6)]"
+    : "bg-slate-800/40 border-slate-700/50 hover:bg-slate-800/60"
+}`}
   >
     <div className="flex justify-between items-start mb-4">
       <h4 className="font-semibold text-slate-200 text-sm leading-tight">{skill.name}</h4>

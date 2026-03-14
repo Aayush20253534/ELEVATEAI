@@ -12,7 +12,9 @@ import {
   TrendingUp,
   Clock,
   Zap,
-  Send
+  Send,
+  Target,
+  ChevronRight
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Sidebar from '../components/sidebar.jsx';
@@ -34,7 +36,7 @@ const StatCard = ({ icon: Icon, label, value, color }) => (
           <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
         </div>
         <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-          Live Update
+          Live
         </div>
       </div>
     </div>
@@ -66,14 +68,9 @@ export default function CareerDashboard() {
   const roadmap = user?.roadmap || [];
 
   const allSkills = roadmap.flatMap(stage => stage.skills || []);
+  const totalCompleted = allSkills.filter(skill => skill.status === "Completed").length;
+  const progress = allSkills.length > 0 ? Math.round((totalCompleted / allSkills.length) * 100) : 0;
 
-  const totalCompleted =
-    allSkills.filter(skill => skill.status === "Completed").length;
-
-  const progress =
-    allSkills.length > 0
-      ? Math.round((totalCompleted / allSkills.length) * 100)
-      : 0;
   const handleLogout = () => {
     localStorage.removeItem("token");
     navigate("/login");
@@ -91,7 +88,6 @@ export default function CareerDashboard() {
     })
       .then(res => setUser(res.data))
       .catch(err => {
-        console.error(err);
         if (err.response?.status === 401) navigate("/login");
       });
   }, [navigate]);
@@ -110,15 +106,10 @@ export default function CareerDashboard() {
       const res = await axios.post(
         "http://127.0.0.1:8000/ai/chat",
         { message: activePrompt },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
       setMessages(prev => [...prev, { role: 'ai', content: res.data.reply }]);
     } catch (err) {
-      console.error("AI error:", err);
       setMessages(prev => [...prev, { role: 'ai', content: "Sorry, I encountered an error processing that request." }]);
     }
     setLoadingAI(false);
@@ -130,13 +121,11 @@ export default function CareerDashboard() {
 
     return text.split('\n').map((line, i) => {
       let processedLine = line.trim();
-
       if (processedLine.startsWith('+')) {
         const letter = String.fromCharCode(97 + (listCounter % 26));
         processedLine = `${letter}) ${processedLine.substring(1).trim()}`;
         listCounter++;
       }
-
       const parts = processedLine.split(/(\*\*.*?\*\*)/g);
       return (
         <div key={i} className={i !== 0 ? "mt-2" : ""}>
@@ -154,39 +143,22 @@ export default function CareerDashboard() {
   return (
     <div className="min-h-screen bg-[#050b14] text-slate-200 flex font-sans selection:bg-blue-500/30 overflow-hidden">
       <style>{`
-        .custom-dark-scrollbar::-webkit-scrollbar {
-          width: 4px;
-        }
-        .custom-dark-scrollbar::-webkit-scrollbar-track {
-          background: transparent;
-        }
-        .custom-dark-scrollbar::-webkit-scrollbar-thumb {
-          background: rgba(255, 255, 255, 0.05);
-          border-radius: 10px;
-        }
-        .custom-dark-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: rgba(255, 255, 255, 0.1);
-        }
+        .custom-dark-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-dark-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-dark-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.05); border-radius: 10px; }
+        .custom-dark-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.1); }
       `}</style>
 
       <Sidebar />
 
-      <main
-        style={{ marginLeft: "var(--sidebar-width)" }}
-        className="flex-1 flex flex-col relative overflow-hidden"
-      >
+      <main style={{ marginLeft: "var(--sidebar-width)" }} className="flex-1 flex flex-col relative overflow-hidden">
         <div className="absolute top-[-10%] left-[20%] w-[500px] h-[500px] bg-blue-600/10 rounded-full blur-[120px] pointer-events-none" />
         <div className="absolute bottom-[-10%] right-[-5%] w-[400px] h-[400px] bg-purple-600/10 rounded-full blur-[100px] pointer-events-none" />
 
         <div className="flex-1 overflow-y-auto p-8 max-w-7xl mx-auto w-full relative z-10 custom-dark-scrollbar">
-
           <section className="mb-10 flex justify-between items-end">
             <div>
-              <motion.div
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                className="flex items-center gap-3 mb-2"
-              >
+              <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-3 mb-2">
                 <h1 className="text-3xl font-bold text-white tracking-tight">
                   Welcome back, {user?.username || "Explorer"}
                 </h1>
@@ -203,9 +175,7 @@ export default function CareerDashboard() {
               <div className="w-8 h-8 rounded-lg bg-white/5 group-hover:bg-red-500/20 flex items-center justify-center transition-colors">
                 <LogOut size={16} className="text-slate-400 group-hover:text-red-400 transition-colors" />
               </div>
-              <span className="text-sm font-semibold text-slate-300 group-hover:text-red-400 transition-colors">
-                Sign Out
-              </span>
+              <span className="text-sm font-semibold text-slate-300 group-hover:text-red-400 transition-colors">Sign Out</span>
             </motion.button>
           </section>
 
@@ -218,38 +188,61 @@ export default function CareerDashboard() {
 
           <div className="grid lg:grid-cols-12 gap-8 mb-8">
             <div className="lg:col-span-4 flex flex-col gap-8 h-[500px]">
-              <div className="bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-md">
-                <h3 className="text-sm font-semibold text-white mb-6 flex items-center justify-between">
-                  Next Milestone
-                  <Cpu size={14} className="text-blue-400" />
-                </h3>
-                <div className="space-y-6">
-                  <div>
-                    <span className="text-[12px] font-bold text-slate-400 uppercase tracking-widest">
-                      {milestone?.stage || "No Roadmap"}
-                      
-                    </span>
+              <div className="bg-gradient-to-br from-white/[0.08] to-transparent border border-white/10 rounded-2xl p-6 backdrop-blur-xl relative overflow-hidden group">
+                <div className="absolute -right-4 -top-4 w-24 h-24 bg-blue-500/10 rounded-full blur-2xl group-hover:bg-blue-500/20 transition-colors duration-500" />
+                
+                <div className="flex items-center justify-between mb-6 relative z-10">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 bg-blue-500/10 rounded-lg">
+                      <Target size={18} className="text-blue-400" />
+                    </div>
+                    <h3 className="text-sm font-bold text-white uppercase tracking-wider">Next Milestone</h3>
+                  </div>
+                  <Cpu size={16} className="text-slate-500" />
+                </div>
 
-                    <br />
-                    <div className="text-[10px] text-slate-400 mb-1">
-                      {progress}% Complete
-                    </div>
-                    <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
-                      <motion.div
-                        initial={{ width: 0 }}
-                        animate={{ width: `${progress}%` }}
-                        transition={{ duration: 1.2 }}
-                        className="h-full bg-blue-500 rounded-full"
-                      />
-                    </div>
-                    <br />
-                    <div className="p-3 bg-white/5 rounded-xl border border-white/5 text-[11px] text-slate-400">
-                      Complete <span className="text-blue-400 font-medium">
-                        {milestone?.skill || "Generate a roadmap"}
-                      </span> to progress your roadmap.
+                <div className="relative z-10">
+                  <div className="mb-4">
+                    <div className="text-[10px] font-black text-blue-400 uppercase tracking-[0.2em] mb-1">Current Stage</div>
+                    <div className="text-lg font-bold text-white leading-tight">
+                      {milestone?.stage || "No Active Roadmap"}
                     </div>
                   </div>
 
+                  <div className="space-y-2 mb-6">
+                    <div className="flex justify-between items-end">
+                      <span className="text-[11px] font-medium text-slate-400">Phase Progress</span>
+                      <span className="text-[11px] font-bold text-blue-400">{progress}%</span>
+                    </div>
+                    <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden border border-white/5">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${progress}%` }}
+                        transition={{ duration: 1.5, ease: "circOut" }}
+                        className="h-full bg-gradient-to-r from-blue-600 to-blue-400 rounded-full shadow-[0_0_12px_rgba(59,130,246,0.5)]"
+                      />
+                    </div>
+                  </div>
+
+                  <div
+  onClick={() =>
+    navigate("/roadmap", {
+      state: { highlightSkill: milestone?.skill }
+    })
+  }
+  className="p-4 bg-black/40 border border-white/5 rounded-xl flex items-start gap-3 group/item cursor-pointer hover:bg-black/60 transition-colors"
+>
+                    <div className="mt-1 w-5 h-5 rounded-full border-2 border-blue-500/30 flex items-center justify-center shrink-0">
+                      <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="text-[10px] font-bold text-slate-500 uppercase mb-1">Critical Skill Focus</div>
+                      <div className="text-xs font-semibold text-slate-200">
+                         {milestone?.skill || "Upload resume to begin"}
+                      </div>
+                    </div>
+                    <ChevronRight size={14} className="text-slate-600 self-center group-hover/item:translate-x-1 transition-transform" />
+                  </div>
                 </div>
               </div>
 
@@ -273,10 +266,9 @@ export default function CareerDashboard() {
                     <CheckCircle2 size={18} className="text-emerald-400" />
                   </div>
                 </div>
-
                 <div className="flex-1 overflow-y-auto custom-dark-scrollbar space-y-3 relative z-10 pr-2">
                   {(!user?.skills || user.skills.length === 0) ? (
-                    <div className="text-center text-slate-400 text-sm py-8">Upload a resume to generate your skill breakdown</div>
+                    <div className="text-center text-slate-400 text-sm py-8">Upload a resume to generate skills</div>
                   ) : (
                     user.skills.map((skill, index) => (
                       <div key={index} className="flex-none h-16 flex justify-between items-center p-4 bg-cyan-400/10 border border-cyan-400/20 rounded-2xl backdrop-blur-sm">
@@ -286,10 +278,12 @@ export default function CareerDashboard() {
                     ))
                   )}
                 </div>
-
-                <button className="mt-6 shrink-0 w-full py-4 bg-white text-[#050b14] hover:bg-emerald-400 transition-colors rounded-2xl font-bold text-sm relative z-10">
-                  View Full Roadmap
-                </button>
+                <button
+  onClick={() => navigate("/roadmap")}
+  className="mt-6 shrink-0 w-full py-4 bg-white text-[#050b14] hover:bg-emerald-400 transition-colors rounded-2xl font-bold text-sm relative z-10"
+>
+  View Full Roadmap
+</button>
               </div>
             </div>
 
@@ -300,7 +294,6 @@ export default function CareerDashboard() {
                     <Sparkles size={12} /> AI Career Copilot
                   </span>
                 </div>
-
                 <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-dark-scrollbar">
                   {messages.map((msg, i) => (
                     <motion.div initial={{ opacity: 0, x: msg.role === 'user' ? 10 : -10 }} animate={{ opacity: 1, x: 0 }} key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
@@ -317,7 +310,6 @@ export default function CareerDashboard() {
                     </div>
                   )}
                 </div>
-
                 <div className="p-4 border-t border-white/5 bg-black/20 space-y-3 shrink-0">
                   <div className="flex flex-wrap gap-2">
                     {['Market Insights', 'Interview Prep', 'Skill Gaps'].map((label) => (
