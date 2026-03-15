@@ -58,98 +58,86 @@ export default function ResumeDashboard() {
     setAnalyzing(false);
   };
 
-const getStatusStyles = (status) => {
-  const s = status.toLowerCase();
-
-  if (s.includes("high") || s.includes("strong")) {
+  const getStatusStyles = (status) => {
+    const s = status.toLowerCase();
+    if (s.includes("high") || s.includes("strong")) {
+      return {
+        color: "text-emerald-400",
+        bg: "bg-emerald-500/10",
+        border: "border-emerald-500/20",
+        bar: "bg-emerald-500",
+        icon: <Trophy className="text-emerald-400" size={20} />
+      };
+    }
+    if (s.includes("medium") || s.includes("moderate")) {
+      return {
+        color: "text-amber-400",
+        bg: "bg-amber-500/10",
+        border: "border-amber-500/20",
+        bar: "bg-amber-500",
+        icon: <TrendingUp className="text-amber-400" size={20} />
+      };
+    }
     return {
-      color: "text-emerald-400",
-      bg: "bg-emerald-500/10",
-      border: "border-emerald-500/20",
-      bar: "bg-emerald-500",
-      icon: <Trophy className="text-emerald-400" size={20} />
+      color: "text-rose-400",
+      bg: "bg-rose-500/10",
+      border: "border-rose-500/20",
+      bar: "bg-rose-500",
+      icon: <BarChart3 className="text-rose-400" size={20} />
     };
-  }
-
-  if (s.includes("medium") || s.includes("moderate")) {
-    return {
-      color: "text-amber-400",
-      bg: "bg-amber-500/10",
-      border: "border-amber-500/20",
-      bar: "bg-amber-500",
-      icon: <TrendingUp className="text-amber-400" size={20} />
-    };
-  }
-
-  return {
-    color: "text-rose-400",
-    bg: "bg-rose-500/10",
-    border: "border-rose-500/20",
-    bar: "bg-rose-500",
-    icon: <BarChart3 className="text-rose-400" size={20} />
   };
-};
 
   return (
     <div className="h-screen max-h-screen bg-[#050b14] flex overflow-hidden font-sans text-slate-200">
       <Sidebar />
-
       <div style={{ marginLeft: "var(--sidebar-width)" }} className="flex flex-col flex-1 min-h-screen relative">
         <div className="absolute top-[-20%] left-[10%] w-[600px] h-[600px] bg-cyan-500/10 blur-[150px] rounded-full pointer-events-none" />
         <div className="absolute bottom-[-20%] right-[10%] w-[500px] h-[500px] bg-violet-600/10 blur-[150px] rounded-full pointer-events-none" />
 
         <main className={`flex-1 px-8 py-12 max-w-7xl mx-auto w-full relative z-10 ${data ? 'overflow-y-auto' : 'overflow-hidden'}`}>
-
           {!data && !analyzing ? (
             <div className="min-h-[70vh] flex items-center justify-center">
-  <motion.div
-    initial={{ opacity: 0, y: 10 }}
-    animate={{ opacity: 1, y: 0 }}
-    className="max-w-2xl mx-auto w-full"
-  >
-              <div className="mb-10 text-center">
-                <h1 className="text-4xl font-bold text-white mb-3 tracking-tight">AI Resume Analyzer</h1>
-                <p className="text-slate-400 text-lg">Benchmark your profile against industry standards.</p>
-              </div>
-
-              <div className="space-y-4">
-                <label className="relative group block w-full border-2 border-dashed border-white/10 rounded-3xl bg-white/[0.02] hover:bg-white/[0.04] hover:border-cyan-500/50 transition-all cursor-pointer">
-                  <div className="flex flex-col items-center justify-center p-12 text-center">
-                    <div className="w-16 h-16 bg-cyan-500/10 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                      <Upload className="text-cyan-400" size={28} />
-                    </div>
-                    <h3 className="text-lg font-bold text-white">{file ? file.name : "Drop Resume Here"}</h3>
-                    <p className="text-sm text-slate-500 mt-2 font-medium">PDF, DOCX up to 10MB</p>
-                  </div>
-                  <input type="file" className="hidden" onChange={(e) => setFile(e.target.files[0])} accept=".pdf,.docx" />
-                </label>
-
-                <div className="relative group">
-                  <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-cyan-400 transition-colors">
-                    <Briefcase size={20} />
-                  </div>
-                  <input
-                    type="text"
-                    value={targetJob}
-                    onChange={(e) => setTargetJob(e.target.value)}
-                    placeholder="Enter target job title"
-                    className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-12 pr-4 text-white focus:outline-none focus:border-cyan-500/50 focus:bg-white/[0.07] transition-all placeholder:text-slate-600"
-                  />
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="max-w-2xl mx-auto w-full">
+                <div className="mb-10 text-center">
+                  <h1 className="text-4xl font-bold text-white mb-3 tracking-tight">AI Resume Analyzer</h1>
+                  <p className="text-slate-400 text-lg">Benchmark your profile against industry standards.</p>
                 </div>
-
-                <button
-                  disabled={!file}
-                  onClick={onUpload}
-                  className={`w-full py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all ${file
-                    ? 'bg-cyan-500 text-[#050b14] hover:bg-cyan-400 shadow-xl shadow-cyan-500/20 active:scale-[0.98]'
-                    : 'bg-white/5 text-slate-500 cursor-not-allowed'
+                <div className="space-y-4">
+                  <label className="relative group block w-full border-2 border-dashed border-white/10 rounded-3xl bg-white/[0.02] hover:bg-white/[0.04] hover:border-cyan-500/50 transition-all cursor-pointer">
+                    <div className="flex flex-col items-center justify-center p-12 text-center">
+                      <div className="w-16 h-16 bg-cyan-500/10 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                        <Upload className="text-cyan-400" size={28} />
+                      </div>
+                      <h3 className="text-lg font-bold text-white">{file ? file.name : "Drop Resume Here"}</h3>
+                      <p className="text-sm text-slate-500 mt-2 font-medium">PDF, DOCX up to 10MB</p>
+                    </div>
+                    <input type="file" className="hidden" onChange={(e) => setFile(e.target.files[0])} accept=".pdf,.docx" />
+                  </label>
+                  <div className="relative group">
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-cyan-400 transition-colors">
+                      <Briefcase size={20} />
+                    </div>
+                    <input
+                      type="text"
+                      value={targetJob}
+                      onChange={(e) => setTargetJob(e.target.value)}
+                      placeholder="Enter target job title"
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-12 pr-4 text-white focus:outline-none focus:border-cyan-500/50 focus:bg-white/[0.07] transition-all placeholder:text-slate-600"
+                    />
+                  </div>
+                  <button
+                    disabled={!file}
+                    onClick={onUpload}
+                    className={`w-full py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all ${file
+                      ? 'bg-cyan-500 text-[#050b14] hover:bg-cyan-400 shadow-xl shadow-cyan-500/20 active:scale-[0.98]'
+                      : 'bg-white/5 text-slate-500 cursor-not-allowed'
                     }`}
-                >
-                  <Sparkles size={18} />
-                  Analyze Profile
-                </button>
-              </div>
-            </motion.div>
+                  >
+                    <Sparkles size={18} />
+                    Analyze Profile
+                  </button>
+                </div>
+              </motion.div>
             </div>
           ) : analyzing ? (
             <div className="h-[70vh] flex flex-col items-center justify-center">
@@ -173,7 +161,6 @@ const getStatusStyles = (status) => {
                       {getStatusStyles(data.market_readiness).icon}
                     </div>
                   </div>
-
                   <div className="space-y-6">
                     <div>
                       <div className="flex justify-between items-end mb-2">
@@ -191,7 +178,6 @@ const getStatusStyles = (status) => {
                         />
                       </div>
                     </div>
-
                     <div className={`p-4 rounded-xl border flex items-center gap-4 ${getStatusStyles(data.market_readiness).bg} ${getStatusStyles(data.market_readiness).border}`}>
                       <ShieldCheck className={getStatusStyles(data.market_readiness).color} size={24} />
                       <div>
@@ -201,7 +187,6 @@ const getStatusStyles = (status) => {
                         </p>
                       </div>
                     </div>
-
                     <div className="pt-4 border-t border-white/5">
                       <p className="text-xs text-slate-400 leading-relaxed italic">
                         Your profile was analyzed against the role: {targetJob}.
@@ -209,7 +194,6 @@ const getStatusStyles = (status) => {
                     </div>
                   </div>
                 </GlassCard>
-
                 <GlassCard className="flex-1 min-h-[200px]">
                   <h3 className="text-white font-bold flex items-center gap-2 mb-4">
                     <Zap size={16} className="text-cyan-400" /> Critical Keywords
@@ -241,7 +225,6 @@ const getStatusStyles = (status) => {
                       ))}
                     </ul>
                   </GlassCard>
-
                   <GlassCard className="border-l-4 border-l-rose-500/50">
                     <div className="flex items-center gap-3 mb-4">
                       <div className="p-2 bg-rose-500/10 rounded-lg">
@@ -261,28 +244,32 @@ const getStatusStyles = (status) => {
 
                 <GlassCard className="flex-1 flex flex-col justify-between">
                   <div>
-                    <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center justify-between mb-8">
                       <h3 className="text-lg font-bold text-white flex items-center gap-3">
                         <Sparkles size={20} className="text-cyan-400" /> AI Rewrite Suggestions
                       </h3>
-                      <div className="flex items-center gap-2">
-                        <button
+                      <div className="flex items-center gap-3">
+                        <motion.button
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
                           onClick={() => navigate("/roadmap", { state: { role: targetJob } })}
-                          className="p-2 rounded-lg bg-white/5 border border-white/10 text-slate-400 hover:text-white transition-colors"
-                          title="Generate Roadmap"
+                          className="px-4 py-2 rounded-xl bg-gradient-to-r from-violet-600/20 to-purple-600/20 border border-violet-500/30 text-violet-400 text-xs font-bold uppercase tracking-widest flex items-center gap-2 hover:from-violet-600/30 hover:to-purple-600/30 transition-all shadow-lg shadow-violet-900/20"
                         >
-                          <Map size={16} />
-                        </button>
-                        <button
+                          <Map size={14} />
+                          Generate Roadmap
+                        </motion.button>
+                        <motion.button
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
                           onClick={() => navigate("/Find_jobs", { state: { jobTitle: targetJob } })}
-                          className="p-2 rounded-lg bg-white/5 border border-white/10 text-slate-400 hover:text-white transition-colors"
-                          title="View Jobs"
+                          className="px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-600/20 to-blue-600/20 border border-cyan-500/30 text-cyan-400 text-xs font-bold uppercase tracking-widest flex items-center gap-2 hover:from-cyan-600/30 hover:to-blue-600/30 transition-all shadow-lg shadow-cyan-900/20"
                         >
-                          <BriefcaseBusiness size={16} />
-                        </button>
+                          <BriefcaseBusiness size={14} />
+                          View Job Matches
+                          <ExternalLink size={12} />
+                        </motion.button>
                       </div>
                     </div>
-
                     <div className="grid grid-cols-1 gap-4 mb-6">
                       <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5 relative">
                         <span className="absolute -top-2.5 left-3 px-2 py-0.5 bg-[#0a111e] text-[9px] font-black text-slate-500 uppercase border border-white/5 rounded">Original</span>
@@ -294,10 +281,9 @@ const getStatusStyles = (status) => {
                       </div>
                     </div>
                   </div>
-
                   <div className="flex gap-3">
                     <button className="flex-1 py-3 bg-cyan-500 text-[#050b14] font-bold rounded-xl text-xs flex items-center justify-center gap-2 hover:bg-cyan-400 transition-all">
-                      <CheckCircle2 size={14} /> Apply
+                      <CheckCircle2 size={14} /> Apply Revision
                     </button>
                     <button className="px-6 py-3 bg-white/5 text-white font-bold rounded-xl text-xs border border-white/10 flex items-center justify-center gap-2 hover:bg-white/10 transition-all">
                       <Copy size={14} /> Copy

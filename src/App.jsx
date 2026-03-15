@@ -5,7 +5,6 @@ import LandingPage from "./pages/landingpage";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import ResumeAnalyzer from "./pages/ResumeAnalyzer";
-import JobMatchesPage from "./pages/Jobs";
 import Interview from "./pages/Interview";
 import FindJobs from "./pages/Find_jobs";
 import ResumeBuilder from "./pages/ResumeBuilder";
@@ -61,15 +60,6 @@ function App() {
         }
       />
 
-      {/* <Route
-        path="/jobs"
-        element={
-          <ProtectedRoute>
-            <JobMatchesPage />
-          </ProtectedRoute>
-        }
-      /> */}
-
       <Route
         path="/Interview"
         element={
@@ -114,7 +104,7 @@ function App() {
           </ProtectedRoute>
         }
       />
-{/* 
+ 
       <Route
         path="/leaderboard"
         element={
@@ -122,7 +112,7 @@ function App() {
             <LeaderboardPage />
           </ProtectedRoute>
         }
-      /> */}
+      /> 
 
       <Route path="*" element={<Navigate to="/" replace />} />
 
