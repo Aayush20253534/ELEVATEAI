@@ -264,46 +264,36 @@ const upcomingSkills = nextStage
                     </div>
                   </div>
 
-                  <div
-  onClick={() =>
-    navigate("/roadmap", {
-      state: { highlightSkill: milestone?.skill }
-    })
-  }
-  className="p-4 bg-black/40 border border-white/5 rounded-xl flex items-start gap-3 group/item cursor-pointer hover:bg-black/60 transition-colors"
->
-                    <div className="mt-1 w-5 h-5 rounded-full border-2 border-blue-500/30 flex items-center justify-center shrink-0">
-                      <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse" />
-                    </div>
                     <div className="flex-1">
-                      <div className="text-[10px] font-bold text-slate-500 uppercase mb-1">Critical Skill Focus</div>
                      <div className="text-xs font-semibold text-slate-200 space-y-2">
-  {upcomingSkills.length > 0 ? (
-    upcomingSkills.slice(0,4).map((skill, i) => (
-      <motion.div
-        key={i}
-        whileHover={{ scale: 1.03 }}
-        whileTap={{ scale: 0.97 }}
-        onClick={() =>
-          navigate("/roadmap", {
-            state: { highlightSkill: skill.name }
-          })
-        }
-        className="flex items-center justify-between p-2 bg-white/5 border border-white/10 rounded-lg cursor-pointer hover:bg-blue-500/10 hover:border-blue-400/30 transition-all"
-      >
-        <span className="text-[11px] font-semibold text-slate-200">
-          {skill.name}
-        </span>
+ {upcomingSkills.length > 0 ? (
+  upcomingSkills.slice(0,4).map((skill, i) => (
+    <motion.div
+      key={i}
+      whileHover={{ scale: 1.03 }}
+      whileTap={{ scale: 0.97 }}
+      onClick={() =>
+        navigate("/roadmap", {
+          state: { highlightSkill: skill.name }
+        })
+      }
+      className="flex-none h-14 flex justify-between items-center p-3 
+      bg-cyan-400/10 border border-cyan-400/20 rounded-2xl 
+      backdrop-blur-sm cursor-pointer 
+      hover:bg-cyan-400/20 transition-all"
+    >
+      <span className="text-[11px] font-bold text-white uppercase tracking-wider">
+        {skill.name}
+      </span>
 
-        <ChevronRight size={14} className="text-slate-500" />
-      </motion.div>
-    ))
-  ) : (
-    "All milestones completed"
-  )}
-</div>
-                    </div>
-                    <ChevronRight size={14} className="text-slate-600 self-center group-hover/item:translate-x-1 transition-transform" />
+      <ChevronRight size={14} className="text-cyan-400" />
+    </motion.div>
+  ))
+) : (
+  <div className="text-xs text-slate-400">All milestones completed</div>
+)}
+           </div>
+                    
                   </div>
                 </div>
               </div>
