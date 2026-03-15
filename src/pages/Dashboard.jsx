@@ -23,25 +23,39 @@ import { useNavigate } from "react-router-dom";
 const StatCard = ({ icon: Icon, label, value, color }) => (
   <motion.div
     whileHover={{ y: -4 }}
-    className="relative overflow-hidden bg-white/5 border border-white/10 p-5 rounded-2xl backdrop-blur-sm"
+    className="relative overflow-hidden bg-white/5 border border-white/10 p-5 rounded-2xl backdrop-blur-sm group"
   >
+
+    {/* glow background */}
     <div className={`absolute top-0 right-0 w-24 h-24 blur-3xl opacity-10 rounded-full -mr-10 -mt-10 ${color}`} />
+
+    {/* corner accents */}
+    <div className="absolute top-2 left-2 w-4 h-4 border-t border-l border-white/20 rounded-tl-md" />
+    <div className="absolute top-2 right-2 w-4 h-4 border-t border-r border-white/20 rounded-tr-md" />
+    <div className="absolute bottom-2 left-2 w-4 h-4 border-b border-l border-white/20 rounded-bl-md" />
+    <div className="absolute bottom-2 right-2 w-4 h-4 border-b border-r border-white/20 rounded-br-md" />
+
+    {/* content */}
     <div className="flex justify-between items-start mb-4">
       <div className={`p-2 rounded-lg bg-white/5 border border-white/10 ${color.replace('bg-', 'text-')}`}>
         <Icon size={20} />
       </div>
+
       <div className="flex items-center gap-2">
         <div className="relative flex h-2 w-2">
           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75"></span>
           <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
         </div>
+
         <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
           Live
         </div>
       </div>
     </div>
+
     <div className="text-2xl font-bold text-white mb-1">{value}</div>
     <div className="text-sm text-slate-400">{label}</div>
+
   </motion.div>
 );
 
@@ -157,27 +171,48 @@ export default function CareerDashboard() {
 
         <div className="flex-1 overflow-y-auto p-8 max-w-7xl mx-auto w-full relative z-10 custom-dark-scrollbar">
           <section className="mb-10 flex justify-between items-end">
-            <div>
-              <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-3 mb-2">
-                <h1 className="text-3xl font-bold text-white tracking-tight">
-                  Welcome back, {user?.username || "Explorer"}
-                </h1>
-              </motion.div>
-              <p className="text-slate-400 text-sm">Real-time career insights and trajectory tracking.</p>
-            </div>
+  <div>
+    <motion.div
+      initial={{ opacity: 0, x: -20 }}
+      animate={{ opacity: 1, x: 0 }}
+      className="flex items-center gap-3 mb-2"
+    >
+      {/* Icon */}
+      <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center backdrop-blur-md">
+        <Sparkles size={18} className="text-cyan-400" />
+      </div>
 
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={handleLogout}
-              className="group flex items-center gap-3 pl-3 pr-4 py-2 bg-white/[0.03] hover:bg-red-500/10 border border-white/10 hover:border-red-500/30 rounded-xl transition-all duration-300 backdrop-blur-md"
-            >
-              <div className="w-8 h-8 rounded-lg bg-white/5 group-hover:bg-red-500/20 flex items-center justify-center transition-colors">
-                <LogOut size={16} className="text-slate-400 group-hover:text-red-400 transition-colors" />
-              </div>
-              <span className="text-sm font-semibold text-slate-300 group-hover:text-red-400 transition-colors">Sign Out</span>
-            </motion.button>
-          </section>
+      {/* Welcome Text */}
+      <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+        <span className="text-slate-400 font-medium">Welcome back,</span>
+
+        <span className="bg-gradient-to-r from-cyan-400 via-blue-400 to-violet-400 bg-clip-text text-transparent drop-shadow-[0_0_8px_rgba(34,211,238,0.3)]">
+          {user?.username || "Explorer"}
+        </span>
+      </h1>
+    </motion.div>
+
+    {/* Subtitle */}
+    <p className="text-slate-400 text-sm flex items-center gap-2">
+      <span className="h-1 w-1 bg-cyan-400 rounded-full animate-pulse"></span>
+      Real-time career insights and trajectory tracking
+    </p>
+  </div>
+
+  <motion.button
+    whileHover={{ scale: 1.02 }}
+    whileTap={{ scale: 0.98 }}
+    onClick={handleLogout}
+    className="group flex items-center gap-3 pl-3 pr-4 py-2 bg-white/[0.03] hover:bg-red-500/10 border border-white/10 hover:border-red-500/30 rounded-xl transition-all duration-300 backdrop-blur-md"
+  >
+    <div className="w-8 h-8 rounded-lg bg-white/5 group-hover:bg-red-500/20 flex items-center justify-center transition-colors">
+      <LogOut size={16} className="text-slate-400 group-hover:text-red-400 transition-colors" />
+    </div>
+    <span className="text-sm font-semibold text-slate-300 group-hover:text-red-400 transition-colors">
+      Sign Out
+    </span>
+  </motion.button>
+</section>
 
           <section className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
             <StatCard icon={TrendingUp} label="Market Readiness" value={user?.market_readiness || "--"} color="bg-blue-500" />
