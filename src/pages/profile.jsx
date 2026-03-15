@@ -101,9 +101,9 @@ const StatsPanel = ({ projects, skills, certifications }) => {
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
       {stats.map((stat, i) => (
         <GlassCard
-          key={i}
-          className={`flex flex-col items-center justify-center py-5 border-l-4 ${stat.borderColor} ${stat.shadow} hover:scale-[1.02] transition-transform cursor-default`}
-        >
+  key={i}
+  className={`h-full flex flex-col items-center justify-center text-center border-l-4 ${stat.borderColor} ${stat.shadow} hover:scale-[1.02] transition-transform cursor-default`}
+>
           <span className="text-2xl font-black text-white tracking-tight">
             {stat.value}
           </span>
@@ -116,17 +116,25 @@ const StatsPanel = ({ projects, skills, certifications }) => {
   );
 };
 
-const ProfessionalLinks = ({ links, setLinks }) => {
+const ProfessionalLinks = ({ links, setLinks, linkedin, setLinkedin }) => {
   const [editing, setEditing] = useState({
     linkedin: false,
     portfolio: false
   });
 
-  const updateLink = (platform, value) => {
-    const updated = links.filter(l => l.platform !== platform);
-    updated.push({ id: platform, platform, url: value });
-    setLinks(updated);
-  };
+const updateLink = (platform, value) => {
+  setLinks(prev => {
+    const index = prev.findIndex(l => l.platform === platform);
+
+    if (index !== -1) {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], url: value };
+      return updated;
+    }
+
+    return [...prev, { platform, url: value }];
+  });
+};
 
   const getUrl = (platform) => {
     const found = links.find(l => l.platform === platform);
@@ -147,8 +155,8 @@ const ProfessionalLinks = ({ links, setLinks }) => {
 
           <input
             disabled={!editing.linkedin}
-            value={getUrl("linkedin")}
-            onChange={(e) => updateLink("linkedin", e.target.value)}
+            value={linkedin}
+            onChange={(e) => setLinkedin(e.target.value)}
             placeholder="LinkedIn Profile URL"
             className={`w-full bg-black/20 border ${editing.linkedin ? "border-blue-500/50" : "border-white/5"
               } rounded-xl py-2.5 pl-10 pr-12 text-gray-300 disabled:opacity-60`}
@@ -221,6 +229,7 @@ const ProfilePage = () => {
   const [links, setLinks] = useState([]);
   const [showSuccess, setShowSuccess] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [linkedin, setLinkedin] = useState("");
 
   const API_BASE = "http://127.0.0.1:8000";
 
@@ -241,6 +250,7 @@ const ProfilePage = () => {
         setCurrentRole(data.current_role || "");
         setTargetRole(data.target_role || "");
         setLinks(Array.isArray(data.professional_links) ? data.professional_links : []);
+        setLinkedin(data.linkedin || "");
         setImage(data.profile_image || null);
         setCoverImage(data.cover_image || null);
         setResume(data.resume || null);
@@ -254,8 +264,17 @@ const ProfilePage = () => {
 
     try {
       await axios.post(
-        `${API_BASE}/profile/update`,
-        { name, username, phone, bio, current_role, target_role, professional_links: links },
+  `${API_BASE}/profile/update`,
+  {
+    name,
+    username,
+    phone,
+    bio,
+    current_role,
+    target_role,
+    linkedin,
+    professional_links: links
+  },
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
@@ -463,7 +482,12 @@ const ProfilePage = () => {
             </div>
 
             <div className="lg:col-span-4 space-y-6">
-              <ProfessionalLinks links={links} setLinks={setLinks} />
+              <ProfessionalLinks
+  links={links}
+  setLinks={setLinks}
+  linkedin={linkedin}
+  setLinkedin={setLinkedin}
+/>
 
               <GlassCard>
                 <SectionHeader icon={Shield} title="Security & Settings" />

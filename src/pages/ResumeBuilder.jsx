@@ -77,13 +77,26 @@ export default function ResumeBuilder() {
   const [resumeHTML, setResumeHTML] = useState('');
   const [user, setUser] = useState(null);
 
-  const isResumeValid =
-    contactInfo.fullName.trim() &&
-    contactInfo.email.trim() &&
-    contactInfo.phone.trim() &&
-    summary.trim() &&
-    skills.length > 0 &&
-    education.length > 0;
+const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactInfo.email);
+const phoneValid = /^[0-9]{10,15}$/.test(contactInfo.phone);
+
+const educationValid = education.every(
+  edu =>
+    edu.degree &&
+    edu.institution &&
+    edu.startYear &&
+    edu.endYear &&
+    (!edu.gpa || (edu.gpa >= 0 && edu.gpa <= 10))
+);
+
+const isResumeValid =
+  contactInfo.fullName.trim() &&
+  emailValid &&
+  phoneValid &&
+  summary.trim() &&
+  skills.length > 0 &&
+  education.length > 0 &&
+  educationValid;
 
   const [messages, setMessages] = useState([
     { role: 'ai', content: "Hello! I'm your AI resume assistant. I've generated your initial resume layout. How would you like to improve it?" }
@@ -255,8 +268,29 @@ export default function ResumeBuilder() {
                 <Card title="Contact Information" icon={User}>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <Input required label="Full Name" value={contactInfo.fullName} onChange={e => setContactInfo({ ...contactInfo, fullName: e.target.value })} placeholder="Jane Doe" />
-                    <Input required label="Email Address" type="email" value={contactInfo.email} onChange={e => setContactInfo({ ...contactInfo, email: e.target.value })} placeholder="jane@example.com" />
-                    <Input required label="Phone Number" value={contactInfo.phone} onChange={e => setContactInfo({ ...contactInfo, phone: e.target.value })} placeholder="+1 555 000 000" />
+                    <Input
+  required
+  label="Email Address"
+  type="email"
+  pattern="[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$"
+  value={contactInfo.email}
+  onChange={e => setContactInfo({ ...contactInfo, email: e.target.value })}
+  placeholder="jane@example.com"
+/>
+  <Input
+  required
+  label="Phone Number"
+  type="tel"
+  inputMode="numeric"
+  pattern="[0-9]{10,15}"
+  maxLength={15}
+  value={contactInfo.phone}
+  onChange={(e) => {
+    const value = e.target.value.replace(/\D/g, ""); // remove non-digits
+    setContactInfo({ ...contactInfo, phone: value });
+  }}
+  placeholder="9876543210"
+/>
                     <Input label="Location" value={contactInfo.location} onChange={e => setContactInfo({ ...contactInfo, location: e.target.value })} placeholder="San Francisco, CA" />
                     <Input label="LinkedIn URL" value={contactInfo.linkedin} onChange={e => setContactInfo({ ...contactInfo, linkedin: e.target.value })} placeholder="linkedin.com/in/janedoe" />
                     <Input label="GitHub URL" value={contactInfo.github} onChange={e => setContactInfo({ ...contactInfo, github: e.target.value })} placeholder="github.com/janedoe" />
@@ -279,22 +313,34 @@ export default function ResumeBuilder() {
                             placeholder="e.g. React.js, Python, AWS"
                             value={skillInput}
                             onChange={e => setSkillInput(e.target.value)}
-                            onKeyDown={e => {
-                              if (e.key === 'Enter' && skillInput.trim()) {
-                                e.preventDefault();
-                                addArrayItem(setSkills, skillInput.trim());
-                                setSkillInput('');
-                              }
-                            }}
+                           onKeyDown={e => {
+  if (e.key === 'Enter' && skillInput.trim()) {
+    e.preventDefault();
+
+    const skill = skillInput.trim().toLowerCase();
+
+    if (!skills.map(s => s.toLowerCase()).includes(skill)) {
+      addArrayItem(setSkills, skillInput.trim());
+    }
+
+    setSkillInput('');
+  }
+}}
                           />
                         </div>
                         <button
                           onClick={() => {
-                            if (skillInput.trim()) {
-                              addArrayItem(setSkills, skillInput.trim());
-                              setSkillInput('');
-                            }
-                          }}
+  if (skillInput.trim()) {
+
+    const skill = skillInput.trim().toLowerCase();
+
+    if (!skills.map(s => s.toLowerCase()).includes(skill)) {
+      addArrayItem(setSkills, skillInput.trim());
+    }
+
+    setSkillInput('');
+  }
+}}
                           className="bg-white/10 hover:bg-white/20 text-white px-4 rounded-lg flex items-center gap-1.5 transition-all text-sm font-medium whitespace-nowrap"
                         >
                           <Plus size={16} /> Add
@@ -358,9 +404,38 @@ export default function ResumeBuilder() {
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
                           <div className="lg:col-span-2"><Input label="Degree" value={edu.degree} onChange={e => updateArrayItem(setEducation, index, 'degree', e.target.value)} /></div>
                           <div className="lg:col-span-3"><Input label="Institution" value={edu.institution} onChange={e => updateArrayItem(setEducation, index, 'institution', e.target.value)} /></div>
-                          <Input label="Start Year" type="number" value={edu.startYear} onChange={e => updateArrayItem(setEducation, index, 'startYear', e.target.value)} />
-                          <Input label="End Year" type="number" value={edu.endYear} onChange={e => updateArrayItem(setEducation, index, 'endYear', e.target.value)} />
-                          <Input label="GPA" value={edu.gpa} onChange={e => updateArrayItem(setEducation, index, 'gpa', e.target.value)} />
+                          <Input
+  label="Start Year"
+  type="date"
+  value={edu.startYear}
+  onChange={e =>
+    updateArrayItem(setEducation, index, 'startYear', e.target.value)
+  }
+/>
+
+<Input
+  label="End Year"
+  type="date"
+  min={edu.startYear}
+  value={edu.endYear}
+  onChange={e =>
+    updateArrayItem(setEducation, index, 'endYear', e.target.value)
+  }
+/>
+                          <Input
+  label="CPI"
+  type="number"
+  min="0"
+  max="10"
+  step="0.01"
+  value={edu.gpa}
+  onChange={e => {
+    const value = parseFloat(e.target.value);
+    if (value >= 0 && value <= 10) {
+      updateArrayItem(setEducation, index, 'gpa', value);
+    }
+  }}
+/>
                         </div>
                       </div>
                     ))}
@@ -424,7 +499,8 @@ export default function ResumeBuilder() {
                   </div>
                 </div>
 
-                <div className="flex justify-center pt-6">
+                {isResumeValid && (
+  <div className="flex justify-center pt-6">
                   <motion.button
                     whileHover={isResumeValid ? { scale: 1.02 } : {}}
                     whileTap={isResumeValid ? { scale: 0.98 } : {}}
@@ -435,6 +511,7 @@ export default function ResumeBuilder() {
                     Compile Resume <Sparkles size={20} />
                   </motion.button>
                 </div>
+                )}
               </motion.div>
             ) : (
               <motion.div

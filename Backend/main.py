@@ -75,6 +75,7 @@ class ProfileUpdate(BaseModel):
     bio: str
     current_role: str
     target_role: str
+    linkedin: str
     professional_links: list
 
 structured_llm = llm.with_structured_output(MarketReadiness)
@@ -474,26 +475,27 @@ def update_profile(
     cursor = conn.cursor()
 
     cursor.execute("""
-        UPDATE users
-        SET name=?,
-            username=?,
-            phone=?,
-            bio=?,
-            current_role=?,
-            target_role=?,
-            professional_links=?
-        WHERE email=?
-    """, (
-        data.name,
-        data.username,
-        data.phone,
-        data.bio,
-        data.current_role,
-        data.target_role,
-        json.dumps(data.professional_links),
-        email
-    ))
-
+    UPDATE users
+    SET name=?,
+        username=?,
+        phone=?,
+        bio=?,
+        current_role=?,
+        target_role=?,
+        linkedin=?,
+        professional_links=?
+    WHERE email=?
+""", (
+    data.name,
+    data.username,
+    data.phone,
+    data.bio,
+    data.current_role,
+    data.target_role,
+    data.linkedin,
+    json.dumps(data.professional_links),
+    email
+))
     conn.commit()
     conn.close()
 

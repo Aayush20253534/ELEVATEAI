@@ -58,17 +58,38 @@ export default function ResumeDashboard() {
     setAnalyzing(false);
   };
 
-  const getStatusStyles = (status) => {
-    if (status.includes("Highly") || status.includes("Strong")) {
-      return { color: "text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/20", bar: "bg-emerald-500", icon: <Trophy className="text-emerald-400" size={20} /> };
-    }
+const getStatusStyles = (status) => {
+  const s = status.toLowerCase();
 
-    if (status.includes("Moderate")) {
-      return { color: "text-amber-400", bg: "bg-amber-500/10", border: "border-amber-500/20", bar: "bg-amber-500", icon: <TrendingUp className="text-amber-400" size={20} /> };
-    }
+  if (s.includes("high") || s.includes("strong")) {
+    return {
+      color: "text-emerald-400",
+      bg: "bg-emerald-500/10",
+      border: "border-emerald-500/20",
+      bar: "bg-emerald-500",
+      icon: <Trophy className="text-emerald-400" size={20} />
+    };
+  }
 
-    return { color: "text-rose-400", bg: "bg-rose-500/10", border: "border-rose-500/20", bar: "bg-rose-500", icon: <BarChart3 className="text-rose-400" size={20} /> };
+  if (s.includes("medium") || s.includes("moderate")) {
+    return {
+      color: "text-amber-400",
+      bg: "bg-amber-500/10",
+      border: "border-amber-500/20",
+      bar: "bg-amber-500",
+      icon: <TrendingUp className="text-amber-400" size={20} />
+    };
+  }
+
+  return {
+    color: "text-rose-400",
+    bg: "bg-rose-500/10",
+    border: "border-rose-500/20",
+    bar: "bg-rose-500",
+    icon: <BarChart3 className="text-rose-400" size={20} />
   };
+};
+
   return (
     <div className="h-screen max-h-screen bg-[#050b14] flex overflow-hidden font-sans text-slate-200">
       <Sidebar />
@@ -77,10 +98,15 @@ export default function ResumeDashboard() {
         <div className="absolute top-[-20%] left-[10%] w-[600px] h-[600px] bg-cyan-500/10 blur-[150px] rounded-full pointer-events-none" />
         <div className="absolute bottom-[-20%] right-[10%] w-[500px] h-[500px] bg-violet-600/10 blur-[150px] rounded-full pointer-events-none" />
 
-        <main className={`flex-1 p-8 max-w-7xl mx-auto w-full relative z-10 ${data ? 'overflow-y-auto' : 'overflow-hidden'}`}>
+        <main className={`flex-1 px-8 py-12 max-w-7xl mx-auto w-full relative z-10 ${data ? 'overflow-y-auto' : 'overflow-hidden'}`}>
 
           {!data && !analyzing ? (
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-12 max-w-2xl mx-auto">
+            <div className="min-h-[70vh] flex items-center justify-center">
+  <motion.div
+    initial={{ opacity: 0, y: 10 }}
+    animate={{ opacity: 1, y: 0 }}
+    className="max-w-2xl mx-auto w-full"
+  >
               <div className="mb-10 text-center">
                 <h1 className="text-4xl font-bold text-white mb-3 tracking-tight">AI Resume Analyzer</h1>
                 <p className="text-slate-400 text-lg">Benchmark your profile against industry standards.</p>
@@ -124,6 +150,7 @@ export default function ResumeDashboard() {
                 </button>
               </div>
             </motion.div>
+            </div>
           ) : analyzing ? (
             <div className="h-[70vh] flex flex-col items-center justify-center">
               <div className="relative w-20 h-20 mb-8">
@@ -134,9 +161,9 @@ export default function ResumeDashboard() {
               <p className="text-slate-500 mt-2">Extracting semantic insights with LLMs</p>
             </div>
           ) : (
-            <div className="flex flex-col lg:flex-row gap-6 min-h-full pb-10 items-start">
+            <div className="flex flex-col lg:flex-row gap-6 items-stretch pb-10">
               <div className="w-full lg:w-1/3 flex flex-col gap-6">
-                <GlassCard className="relative overflow-hidden border-t-4 border-t-cyan-500/50">
+                <GlassCard className="h-fit border-t-4 border-t-cyan-500/50">
                   <div className="flex items-center justify-between mb-8">
                     <div>
                       <h3 className="text-white font-bold text-xl">Market Readiness</h3>
@@ -178,19 +205,18 @@ export default function ResumeDashboard() {
                     <div className="pt-4 border-t border-white/5">
                       <p className="text-xs text-slate-400 leading-relaxed italic">
                         Your profile was analyzed against the role: {targetJob}.
-                        Addressing the identified gaps could significantly increase your market readiness.
                       </p>
                     </div>
                   </div>
                 </GlassCard>
 
-                <GlassCard>
-                  <h3 className="text-md font-bold text-white mb-6 flex items-center gap-2">
+                <GlassCard className="flex-1 min-h-[200px]">
+                  <h3 className="text-white font-bold flex items-center gap-2 mb-4">
                     <Zap size={16} className="text-cyan-400" /> Critical Keywords
                   </h3>
                   <div className="flex flex-wrap gap-2">
                     {data.missing_keywords.map((kw, i) => (
-                      <span key={i} className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-xs font-medium text-slate-300 hover:border-cyan-500/30 transition-colors">
+                      <span key={i} className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-[11px] font-medium text-slate-300 hover:border-cyan-500/30 transition-colors">
                         {kw}
                       </span>
                     ))}
@@ -201,95 +227,81 @@ export default function ResumeDashboard() {
               <div className="w-full lg:w-2/3 flex flex-col gap-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <GlassCard className="border-l-4 border-l-emerald-500/50">
-                    <div className="flex items-center gap-3 mb-6">
+                    <div className="flex items-center gap-3 mb-4">
                       <div className="p-2 bg-emerald-500/10 rounded-lg">
-                        <CheckCircle2 size={20} className="text-emerald-500" />
+                        <CheckCircle2 size={18} className="text-emerald-500" />
                       </div>
-                      <h3 className="font-bold text-white">Competitive Strengths</h3>
+                      <h3 className="font-bold text-white text-sm">Competitive Strengths</h3>
                     </div>
-                    <ul className="space-y-4">
+                    <ul className="space-y-3">
                       {data.strengths.map((s, i) => (
-                        <li key={i} className="text-sm text-slate-400 flex items-start gap-3">
-                          <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 mt-2 shrink-0" /> {s}
+                        <li key={i} className="text-xs text-slate-400 flex items-start gap-2">
+                          <div className="h-1 w-1 rounded-full bg-emerald-500 mt-1.5 shrink-0" /> {s}
                         </li>
                       ))}
                     </ul>
                   </GlassCard>
 
                   <GlassCard className="border-l-4 border-l-rose-500/50">
-                    <div className="flex items-center gap-3 mb-6">
+                    <div className="flex items-center gap-3 mb-4">
                       <div className="p-2 bg-rose-500/10 rounded-lg">
-                        <AlertTriangle size={20} className="text-rose-500" />
+                        <AlertTriangle size={18} className="text-rose-500" />
                       </div>
-                      <h3 className="font-bold text-white">Optimization Gaps</h3>
+                      <h3 className="font-bold text-white text-sm">Optimization Gaps</h3>
                     </div>
-                    <ul className="space-y-4">
+                    <ul className="space-y-3">
                       {data.weaknesses.map((w, i) => (
-                        <li key={i} className="text-sm text-slate-400 flex items-start gap-3">
-                          <div className="h-1.5 w-1.5 rounded-full bg-rose-500 mt-2 shrink-0" /> {w}
+                        <li key={i} className="text-xs text-slate-400 flex items-start gap-2">
+                          <div className="h-1 w-1 rounded-full bg-rose-500 mt-1.5 shrink-0" /> {w}
                         </li>
                       ))}
                     </ul>
                   </GlassCard>
                 </div>
 
-                <GlassCard className="relative overflow-hidden group">
-                  <div className="flex items-center justify-between mb-8">
-                    <h3 className="text-lg font-bold text-white flex items-center gap-3">
-                      <Sparkles size={20} className="text-cyan-400" /> AI Rewrite Suggestions
-                    </h3>
+                <GlassCard className="flex-1 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between mb-6">
+                      <h3 className="text-lg font-bold text-white flex items-center gap-3">
+                        <Sparkles size={20} className="text-cyan-400" /> AI Rewrite Suggestions
+                      </h3>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => navigate("/roadmap", { state: { role: targetJob } })}
+                          className="p-2 rounded-lg bg-white/5 border border-white/10 text-slate-400 hover:text-white transition-colors"
+                          title="Generate Roadmap"
+                        >
+                          <Map size={16} />
+                        </button>
+                        <button
+                          onClick={() => navigate("/Find_jobs", { state: { jobTitle: targetJob } })}
+                          className="p-2 rounded-lg bg-white/5 border border-white/10 text-slate-400 hover:text-white transition-colors"
+                          title="View Jobs"
+                        >
+                          <BriefcaseBusiness size={16} />
+                        </button>
+                      </div>
+                    </div>
 
-                    <div className="flex items-center gap-3">
-                      <motion.button
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={() =>
-                          navigate("/roadmap", {
-                            state: { role: targetJob }
-                          })
-                        }
-                        className="px-4 py-2 rounded-xl bg-gradient-to-r from-violet-600/20 to-purple-600/20 border border-violet-500/30 text-violet-400 text-xs font-bold uppercase tracking-widest flex items-center gap-2 hover:from-violet-600/30 hover:to-purple-600/30 transition-all shadow-lg shadow-violet-900/20"
-                      >
-                        <Map size={14} />
-                        Generate Roadmap
-                      </motion.button>
-
-                      <motion.button
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={() =>
-                          navigate("/Find_jobs", {
-                            state: { jobTitle: targetJob }
-                          })
-                        }
-                        className="px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-600/20 to-blue-600/20 border border-cyan-500/30 text-cyan-400 text-xs font-bold uppercase tracking-widest flex items-center gap-2 hover:from-cyan-600/30 hover:to-blue-600/30 transition-all shadow-lg shadow-cyan-900/20"
-                      >
-                        <BriefcaseBusiness size={14} />
-                        View Job Matches
-                        <ExternalLink size={12} />
-                      </motion.button>
+                    <div className="grid grid-cols-1 gap-4 mb-6">
+                      <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5 relative">
+                        <span className="absolute -top-2.5 left-3 px-2 py-0.5 bg-[#0a111e] text-[9px] font-black text-slate-500 uppercase border border-white/5 rounded">Original</span>
+                        <p className="text-xs text-slate-500 italic leading-relaxed">{data.weak_line}</p>
+                      </div>
+                      <div className="p-4 rounded-xl bg-cyan-500/[0.03] border border-cyan-500/20 relative">
+                        <span className="absolute -top-2.5 left-3 px-2 py-0.5 bg-[#0a111e] text-[9px] font-black text-cyan-400 uppercase border border-cyan-500/20 rounded">AI Optimized</span>
+                        <p className="text-xs text-white font-medium leading-relaxed">{data.suggestions}</p>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="space-y-6">
-                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                      <div className="p-5 rounded-2xl bg-white/[0.02] border border-white/5 relative">
-                        <span className="absolute -top-3 left-4 px-2 py-0.5 bg-[#0a111e] text-[10px] font-black text-slate-500 uppercase border border-white/5 rounded">Draft</span>
-                        <p className="text-sm text-slate-500 italic leading-relaxed">{data.weak_line}</p>
-                      </div>
-                      <div className="p-5 rounded-2xl bg-cyan-500/[0.03] border border-cyan-500/20 relative">
-                        <span className="absolute -top-3 left-4 px-2 py-0.5 bg-[#0a111e] text-[10px] font-black text-cyan-400 uppercase border border-cyan-500/20 rounded tracking-tighter">Optimized</span>
-                        <p className="text-sm text-white font-medium leading-relaxed">{data.suggestions}</p>
-                      </div>
-                    </div>
-                    <div className="flex gap-4">
-                      <button className="flex-1 py-4 bg-cyan-500 text-[#050b14] font-bold rounded-xl text-sm flex items-center justify-center gap-2 hover:bg-cyan-400 transition-all active:scale-[0.98]">
-                        <CheckCircle2 size={16} /> Apply Revision
-                      </button>
-                      <button className="px-8 py-4 bg-white/5 text-white font-bold rounded-xl text-sm border border-white/10 flex items-center justify-center gap-2 hover:bg-white/10 transition-all">
-                        <Copy size={16} /> Copy
-                      </button>
-                    </div>
+                  <div className="flex gap-3">
+                    <button className="flex-1 py-3 bg-cyan-500 text-[#050b14] font-bold rounded-xl text-xs flex items-center justify-center gap-2 hover:bg-cyan-400 transition-all">
+                      <CheckCircle2 size={14} /> Apply
+                    </button>
+                    <button className="px-6 py-3 bg-white/5 text-white font-bold rounded-xl text-xs border border-white/10 flex items-center justify-center gap-2 hover:bg-white/10 transition-all">
+                      <Copy size={14} /> Copy
+                    </button>
                   </div>
                 </GlassCard>
               </div>
