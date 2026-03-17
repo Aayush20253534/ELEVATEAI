@@ -14,7 +14,7 @@ import LeaderboardPage from "./pages/leaderboard";
 import AboutPage from "./components/About";
 import LegalPage from "./components/Policy";
 import PlatformPage from "./components/Platform";
-
+import ElevateAIChat from "./pages/messages";
 
 const ProtectedRoute = ({ children }) => {
   const user = localStorage.getItem("user");
@@ -116,6 +116,22 @@ function App() {
         }
       /> 
 
+      <Route
+        path="/messages"
+        element={
+          <ProtectedRoute>
+            <ElevateAIChat />
+          </ProtectedRoute>
+        }
+      /> 
+      <Route
+  path="/chat/:receiver_id"
+  element={
+    <ProtectedRoute>
+      <ElevateAIChat />
+    </ProtectedRoute>
+  }
+/>
       <Route path="*" element={<Navigate to="/" replace />} />
 
     </Routes>

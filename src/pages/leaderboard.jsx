@@ -39,7 +39,10 @@ const RankBadge = ({ rank }) => {
   );
 };
 
-const UserCard = ({ user, rank, onClick }) => (
+const UserCard = ({ user, rank, onClick, navigate, currentUser }) => {
+  const isSelf = String(currentUser?.id) === String(user.id);
+
+  return (
   <motion.div
     layout
     onClick={onClick}
@@ -106,10 +109,24 @@ const UserCard = ({ user, rank, onClick }) => (
       </div>
     </div>
 
-    <div className="flex gap-2">
-      <button className="p-3 rounded-xl bg-white/5 hover:bg-blue-500/20 text-gray-400 hover:text-blue-400 transition-all border border-white/10 hover:border-blue-500/40">
-        <MessageSquare size={18} />
-      </button>
+    
+
+<div className="flex gap-2">
+  {isSelf ? (
+    <div className="px-4 py-3 rounded-xl bg-gray-800 text-gray-500 border border-gray-700 text-sm font-bold">
+      You
+    </div>
+  ) : (
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        navigate(`/chat/${user.id}`);
+      }}
+      className="p-3 rounded-xl bg-white/5 hover:bg-blue-500/20 text-gray-400 hover:text-blue-400 transition-all border border-white/10 hover:border-blue-500/40"
+    >
+      <MessageSquare size={18} />
+    </button>
+  )}
       <button className="flex items-center gap-2 px-5 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm transition-all shadow-lg shadow-blue-600/20">
         <UserPlus size={18} />
         <span className="hidden sm:inline">Connect</span>
@@ -117,6 +134,7 @@ const UserCard = ({ user, rank, onClick }) => (
     </div>
   </motion.div>
 );
+};
 
 const LeaderboardPage = () => {
   const navigate = useNavigate(); 
@@ -124,6 +142,7 @@ const LeaderboardPage = () => {
   const [totalUsers, setTotalUsers] = useState(0);
   const [trendingSkill, setTrendingSkill] = useState("");
   const [search, setSearch] = useState("");
+  const [currentUser, setCurrentUser] = useState(null);
   const [sortBy, setSortBy] = useState("relevancyScore");
   const [activeFilter, setActiveFilter] = useState("All");
 
@@ -154,6 +173,22 @@ const LeaderboardPage = () => {
     fetchLeaderboard();
   }, []);
 
+  useEffect(() => {
+  const fetchMe = async () => {
+    try {
+      const res = await axios.get("http://localhost:8000/me", {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`
+        }
+      });
+      setCurrentUser(res.data);
+    } catch (err) {
+      console.error("User fetch error:", err);
+    }
+  };
+
+  fetchMe();
+}, []);
   const filteredUsers = useMemo(() => {
     return users
       .filter(u =>
@@ -250,6 +285,8 @@ const LeaderboardPage = () => {
                   user={user}
                   rank={index + 1}
                   onClick={() => navigate(`/profile/${user.id}`)}
+                  navigate={navigate}
+                  currentUser={currentUser}
                 />
               ))}
             </AnimatePresence>

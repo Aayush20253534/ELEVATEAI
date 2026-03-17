@@ -12,7 +12,8 @@ import {
   Search,
   FileEdit,
   Trophy,
-  PanelLeft
+  PanelLeft,
+  MessageSquare
 
 } from "lucide-react";
 
@@ -44,7 +45,8 @@ const Sidebar = () => {
   { name: "Skill Roadmap", icon: Map, path: "/Roadmap" },
   { name: "Interview", icon: Mic2, path: "/Interview" },
   { name: "Profile", icon: User, path: "/profile" },
-  { name: "Leaderboard", icon: Trophy, path: "/leaderboard" }
+  { name: "Leaderboard", icon: Trophy, path: "/leaderboard" },
+  { name: "Messages", icon: MessageSquare, path: "/messages" }
 ];
 
   return (

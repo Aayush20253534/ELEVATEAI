@@ -32,6 +32,10 @@ app = FastAPI()
 roadmap_engine = Roadmap()
 app.mount("/images", StaticFiles(directory="profile_images"), name="images")
 app.mount("/resume-files", StaticFiles(directory="resume"), name="resume-files")
+UPLOAD_DIR = "uploads"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 load_dotenv()
 
 llm = ChatGoogleGenerativeAI(
@@ -210,46 +214,81 @@ def init_db():
     cursor = conn.cursor()
 
     cursor.execute("""
-CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT,
-    username TEXT,
-    email TEXT UNIQUE,
-    password TEXT,
-    phone TEXT,
-    bio TEXT,
-    linkedin TEXT,
-    current_role TEXT,
-    target_role TEXT,
-    professional_links TEXT,
-    profile_image TEXT,
-    cover_image TEXT,
-    market_readiness TEXT,
-    skills TEXT,
-    projects TEXT,
-    certifications TEXT,
-    resume TEXT,
-    resume_analysis TEXT,
-    roadmap TEXT,
-    created_at TEXT,
-    last_active_date TEXT,
-    learning_streak INTEGER DEFAULT 1
-)
-""")
+    CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT,
+        username TEXT,
+        email TEXT UNIQUE,
+        password TEXT,
+        phone TEXT,
+        bio TEXT,
+        linkedin TEXT,
+        current_role TEXT,
+        target_role TEXT,
+        professional_links TEXT,
+        profile_image TEXT,
+        cover_image TEXT,
+        market_readiness TEXT,
+        skills TEXT,
+        projects TEXT,
+        certifications TEXT,
+        resume TEXT,
+        resume_analysis TEXT,
+        roadmap TEXT,
+        created_at TEXT,
+        last_active_date TEXT,
+        learning_streak INTEGER DEFAULT 1
+    )
+    """)
+
     cursor.execute("""
-CREATE TABLE IF NOT EXISTS chat_messages (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_email TEXT,
-    role TEXT,
-    message TEXT,
-    response_time REAL,
-    created_at TEXT
-)
-""")
+    CREATE TABLE IF NOT EXISTS chat_messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_email TEXT,
+        role TEXT,
+        message TEXT,
+        response_time REAL,
+        created_at TEXT
+    )
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS direct_messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        sender_id INTEGER,
+        receiver_id INTEGER,
+        message TEXT,
+        created_at TEXT,
+        deleted_for_sender INTEGER DEFAULT 0,
+        deleted_for_receiver INTEGER DEFAULT 0
+    )
+    """)
+
+    # 🔥 SAFETY: Add columns if DB already exists
+    try:
+        cursor.execute("ALTER TABLE direct_messages ADD COLUMN deleted_for_sender INTEGER DEFAULT 0")
+    except:
+        pass
+
+    try:
+        cursor.execute("ALTER TABLE direct_messages ADD COLUMN deleted_for_receiver INTEGER DEFAULT 0")
+    except:
+        pass
+    try:
+        cursor.execute("ALTER TABLE direct_messages ADD COLUMN file_url TEXT")
+    except:
+        pass
+    try:
+        cursor.execute("ALTER TABLE direct_messages ADD COLUMN file_type TEXT")
+    except:
+        pass
+    try:
+        cursor.execute("ALTER TABLE direct_messages ADD COLUMN file_name TEXT")
+    except:
+        pass
 
     conn.commit()
     conn.close()
-
 
 init_db()
 
@@ -390,7 +429,7 @@ def login(data: LoginRequest):
     cursor = conn.cursor()
 
     cursor.execute(
-    "SELECT name, username, linkedin, email, password, last_active_date, learning_streak FROM users WHERE email = ?",
+    "SELECT id, name, username, linkedin, email, password, last_active_date, learning_streak FROM users WHERE email = ?",
     (data.email,)
 )
 
@@ -400,7 +439,7 @@ def login(data: LoginRequest):
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    name, username, linkedin, email, password_hash, last_active, streak = user
+    user_id, name, username, linkedin, email, password_hash, last_active, streak = user
 
     if not verify_password(data.password, password_hash):
         raise HTTPException(status_code=401, detail="Invalid credentials")
@@ -436,6 +475,7 @@ def login(data: LoginRequest):
     return {
         "token": token,
         "user": {
+            "id": user_id,
             "name": name,
             "username": username,
             "linkedin": linkedin,
@@ -1062,6 +1102,284 @@ def get_user_profile(user_id: int):
     user["professional_links"] = json.loads(user["professional_links"]) if user["professional_links"] else []
 
     return user
+
+class SendMessage(BaseModel):
+    receiver_id: int
+    message: str
+
+@app.post("/messages/send")
+async def send_message(
+    receiver_id: int = Form(...),
+    message: str = Form(""),
+    file: UploadFile = File(None),
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    email = verify_token(credentials.credentials)
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    # 🔍 Get sender
+    cursor.execute("SELECT id FROM users WHERE email=?", (email,))
+    sender = cursor.fetchone()
+
+    if not sender:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    sender_id = sender["id"]
+
+    # 🔍 Check receiver exists ✅ (your requested part)
+    cursor.execute("SELECT id FROM users WHERE id=?", (receiver_id,))
+    receiver = cursor.fetchone()
+
+    if not receiver:
+        raise HTTPException(status_code=404, detail="Receiver not found")
+
+    # 🚫 Prevent self messaging
+    if sender_id == receiver_id:
+        raise HTTPException(status_code=400, detail="You cannot message yourself")
+
+    # 🚫 Prevent empty message + no file
+    if not message and not file:
+        raise HTTPException(status_code=400, detail="Message or file required")
+
+    file_url = None
+    file_type = None
+    file_name = None
+
+    if file:
+        contents = await file.read()
+        file_name = file.filename 
+
+        # 📏 File size limit (10MB)
+        if len(contents) > 10 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="File too large (max 10MB)")
+
+        # 🔒 Allowed MIME types
+        allowed_types = [
+            "image/png", "image/jpeg", "image/jpg",
+            "application/pdf",
+            "video/mp4",
+            "audio/mpeg"
+        ]
+
+        if file.content_type not in allowed_types:
+            raise HTTPException(status_code=400, detail="Unsupported file type")
+
+        # 🔒 Extension safety
+        SAFE_EXTENSIONS = ["png", "jpg", "jpeg", "pdf", "mp4", "mp3"]
+        ext = file.filename.split(".")[-1].lower()
+
+        if ext not in SAFE_EXTENSIONS:
+            raise HTTPException(status_code=400, detail="Invalid file extension")
+
+        # 💾 Save file
+        filename = f"{uuid.uuid4()}.{ext}"
+        path = os.path.join("uploads", filename)
+
+        with open(path, "wb") as f:
+            f.write(contents)
+
+        file_url = f"/uploads/{filename}"
+        file_type = file.content_type
+
+    # 💬 Save message
+    cursor.execute("""
+        INSERT INTO direct_messages 
+        (sender_id, receiver_id, message, file_url, file_type, file_name, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (
+        sender_id,
+        receiver_id,
+        message,
+        file_url,
+        file_type,
+        file_name,
+        datetime.utcnow().isoformat()
+    ))
+
+    conn.commit()
+    conn.close()
+
+    return {"message": "sent"}
+@app.get("/messages/inbox")
+def get_inbox(credentials: HTTPAuthorizationCredentials = Depends(security)):
+
+    email = verify_token(credentials.credentials)
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT id FROM users WHERE email=?", (email,))
+    user = cursor.fetchone()
+    user_id = user["id"]
+
+    cursor.execute("""
+        SELECT 
+            CASE 
+                WHEN sender_id = ? THEN receiver_id
+                ELSE sender_id
+            END as other_user_id,
+            MAX(created_at) as last_time
+        FROM direct_messages
+        WHERE sender_id = ? OR receiver_id = ?
+        GROUP BY other_user_id
+        ORDER BY last_time DESC
+    """, (user_id, user_id, user_id))
+
+    rows = cursor.fetchall()
+
+    conversations = []
+
+    for r in rows:
+        other_id = r["other_user_id"]
+
+        cursor.execute("SELECT id, name FROM users WHERE id=?", (other_id,))
+        user_data = cursor.fetchone()
+
+        cursor.execute("""
+            SELECT sender_id, message, file_url, file_type FROM direct_messages
+            WHERE 
+            (
+                sender_id=? AND receiver_id=? AND deleted_for_sender=0
+            )
+            OR
+            (
+                sender_id=? AND receiver_id=? AND deleted_for_receiver=0
+            )
+            ORDER BY created_at DESC LIMIT 1
+        """, (user_id, other_id, other_id, user_id))
+
+        last_msg = cursor.fetchone()
+
+        if not last_msg:
+            continue  # 🚨 skip empty chats
+
+        conversations.append({
+            "user_id": user_data["id"],
+            "name": user_data["name"],
+            "last_message": (
+    last_msg["message"] 
+    if last_msg["message"] 
+    else f"📎 {last_msg['file_type'] or 'File'}"
+),
+            "last_sender_id": last_msg["sender_id"]
+        })
+
+    conn.close()
+    return conversations
+
+@app.delete("/messages/{message_id}")
+def delete_message(
+    message_id: int,
+    delete_for_everyone: bool = False,
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    email = verify_token(credentials.credentials)
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    # 🔍 get user id
+    cursor.execute("SELECT id FROM users WHERE email=?", (email,))
+    user = cursor.fetchone()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user_id = user["id"]
+
+    # 🔍 get message + file
+    cursor.execute("""
+        SELECT sender_id, receiver_id, file_url 
+        FROM direct_messages 
+        WHERE id=?
+    """, (message_id,))
+    msg = cursor.fetchone()
+
+    if not msg:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    sender_id = msg["sender_id"]
+    receiver_id = msg["receiver_id"]
+    file_url = msg["file_url"]
+
+    # 🔥 DELETE FOR EVERYONE (only sender allowed)
+    if delete_for_everyone and user_id == sender_id:
+        cursor.execute("""
+            UPDATE direct_messages
+            SET deleted_for_sender=1, deleted_for_receiver=1
+            WHERE id=?
+        """, (message_id,))
+
+        # 🧹 delete file from storage
+        if file_url:
+            try:
+                file_path = file_url.replace("/uploads/", "uploads/")
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+            except Exception as e:
+                print("File delete error:", e)
+
+    # 🧠 DELETE FOR ME
+    else:
+        if user_id == sender_id:
+            cursor.execute("""
+                UPDATE direct_messages
+                SET deleted_for_sender=1
+                WHERE id=?
+            """, (message_id,))
+        elif user_id == receiver_id:
+            cursor.execute("""
+                UPDATE direct_messages
+                SET deleted_for_receiver=1
+                WHERE id=?
+            """, (message_id,))
+        else:
+            raise HTTPException(status_code=403, detail="Not allowed")
+
+    conn.commit()
+    conn.close()
+
+    return {"message": "deleted"}
+@app.get("/messages/{user_id}")
+def get_messages(user_id: int,
+                 credentials: HTTPAuthorizationCredentials = Depends(security)):
+
+    email = verify_token(credentials.credentials)
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    # current user
+    cursor.execute("SELECT id FROM users WHERE email=?", (email,))
+    current = cursor.fetchone()
+
+    if not current:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    current_user_id = current["id"]
+
+    if current_user_id == user_id:
+        raise HTTPException(status_code=400, detail="Invalid conversation")
+
+    cursor.execute("""
+        SELECT * FROM direct_messages
+        WHERE 
+        (
+            sender_id=? AND receiver_id=? AND deleted_for_sender=0
+        )
+        OR
+        (
+            sender_id=? AND receiver_id=? AND deleted_for_receiver=0
+        )
+        ORDER BY created_at ASC
+    """, (current_user_id, user_id, user_id, current_user_id))
+
+    messages = cursor.fetchall()
+    conn.close()
+
+    return [dict(m) for m in messages]
 
 @app.post("/interview/submit")
 async def submit_answer(
