@@ -21,22 +21,31 @@ from dotenv import load_dotenv
 from pydantic import Field
 from fastapi import Form
 from fastapi.staticfiles import StaticFiles
-
+import uvicorn
 from interview_ai import generate_question, evaluate_answer, analyze_video
 from models import InterviewStart, InterviewAnswer
 
 from chatbot_service import ask_bot
 from web_scraping import LinkedInScraper, NaukriScraper, SerpApiScraper
 
+# -------- CREATE DIRECTORIES FIRST -------- #
+UPLOAD_DIR = "uploads"
+PROFILE_DIR = "profile_images"
+RESUME_DIR = "resume"
 
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+os.makedirs(PROFILE_DIR, exist_ok=True)
+os.makedirs(RESUME_DIR, exist_ok=True)
+
+# -------- INIT APP -------- #
 app = FastAPI()
 roadmap_engine = Roadmap()
-app.mount("/images", StaticFiles(directory="profile_images"), name="images")
-app.mount("/resume-files", StaticFiles(directory="resume"), name="resume-files")
-UPLOAD_DIR = "uploads"
-os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+# -------- MOUNT AFTER CREATION -------- #
+app.mount("/images", StaticFiles(directory=PROFILE_DIR), name="images")
+app.mount("/resume-files", StaticFiles(directory=RESUME_DIR), name="resume-files")
+app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
+
 load_dotenv()
 
 llm = ChatGoogleGenerativeAI(
@@ -45,10 +54,6 @@ llm = ChatGoogleGenerativeAI(
     temperature=0
 )
 
-PROFILE_DIR = "profile_images"
-os.makedirs(PROFILE_DIR, exist_ok=True)
-RESUME_DIR = "resume"
-os.makedirs(RESUME_DIR, exist_ok=True)
 
 
 class WeakLineFeedback(BaseModel):
@@ -670,8 +675,6 @@ async def upload_cover_image(
 
 # ---------------- FILE UPLOAD ---------------- #
 
-UPLOAD_DIR = "uploads"
-os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 @app.get("/roadmap/user")
 def get_user_roadmap(
@@ -1451,8 +1454,8 @@ async def submit_answer(
     "difficulty": next_difficulty,
     "question_number": session["question_number"]
 }
-import uvicorn
-import os
+
+
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
