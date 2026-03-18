@@ -260,7 +260,11 @@ const ProfilePage = () => {
 
   // viewing another user's profile
   if (id) {
-    axios.get(`${API}/user/${id}`)
+    axios.get(`${API}/user/${id}`, {
+  headers: {
+    Authorization: `Bearer ${localStorage.getItem("token")}`
+  }
+})
       .then(res => loadUser(res.data))
       .catch(err => console.error("Error fetching user:", err));
   }

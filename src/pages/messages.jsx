@@ -419,10 +419,29 @@ const currentTheme = THEMES[theme] || THEMES.dark;
   const [selectedFile, setSelectedFile] = useState(null);
   const scrollRef = useRef(null);
   const [showFriends, setShowFriends] = useState(false);
+  const [requestCount, setRequestCount] = useState(0);
   const currentUser = JSON.parse(localStorage.getItem("user"));
   const currentUserId = currentUser?.id;
   const token = localStorage.getItem("token");
 
+  useEffect(() => {
+  const fetchRequestsCount = async () => {
+    try {
+      const res = await axios.get(`${API}/friends/requests`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      setRequestCount(res.data.length);
+    } catch (err) {
+      console.error("Request count error", err);
+    }
+  };
+
+  fetchRequestsCount();
+
+  const interval = setInterval(fetchRequestsCount, 5000);
+  return () => clearInterval(interval);
+}, [token]);
 useEffect(() => {
   if (!token) {
     navigate("/login");
@@ -665,7 +684,30 @@ const filteredMessages = messages.filter((msg) => {
             <div className="flex justify-between items-center">
               <h1 className="text-xl font-bold text-white">Chats</h1>
               <div className="flex gap-2">
-                <button className="p-2 hover:bg-slate-800 rounded-full text-slate-400"><Users size={20} onClick={() => setShowFriends(true)} /></button>
+                <button className="p-2 hover:bg-slate-800 rounded-full text-slate-400">
+  <div 
+    className="relative cursor-pointer"
+    onClick={() => {
+      setShowFriends(true);
+      // optional: remove this if you don’t want reset
+      // setRequestCount(0);
+    }}
+  >
+    <Users size={20} />
+
+    {requestCount > 0 && (
+  <motion.span
+    key={requestCount}
+    initial={{ scale: 0 }}
+    animate={{ scale: 1 }}
+    transition={{ type: "spring", stiffness: 300 }}
+    className="absolute -top-1 -right-1 bg-green-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold"
+  >
+    +{requestCount}
+  </motion.span>
+)}
+  </div>
+</button>
               </div>
             </div>
 

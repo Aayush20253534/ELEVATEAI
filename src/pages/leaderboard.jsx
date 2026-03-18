@@ -107,7 +107,7 @@ const UserCard = ({ user, rank, onClick, navigate, currentUser }) => {
       </div>
     </div>
 
-    <div className="grid-cols-3 gap-8 px-8 border-x border-white/5 hidden lg:grid">
+    <div className="grid-cols-4 gap-8 px-8 border-x border-white/5 hidden lg:grid">
       <div className="text-center">
         <p className="text-xl font-bold text-white">{user.projectsBuilt || 0}</p>
         <p className="text-[10px] text-gray-500 uppercase font-bold tracking-tighter">Projects Built</p>
@@ -119,6 +119,12 @@ const UserCard = ({ user, rank, onClick, navigate, currentUser }) => {
       <div className="text-center">
         <p className="text-xl font-bold text-white">{user.skillsMastered || 0}</p>
         <p className="text-[10px] text-gray-500 uppercase font-bold tracking-tighter">Skills Mastered</p>
+      </div>
+      <div className="text-center">
+        <p className="text-xl font-bold text-white">{user.profileViews || 0}</p>
+        <p className="text-[10px] text-gray-500 uppercase font-bold tracking-tighter">
+           Profile Views
+       </p>
       </div>
     </div>
 
@@ -308,6 +314,7 @@ const LeaderboardPage = () => {
                   <option value="projectsBuilt">Sort by: Projects</option>
                   <option value="modulesCompleted">Sort by: Modules</option>
                   <option value="skillsMastered">Sort by: Skills</option>
+                  <option value="profileViews">Sort by: Profile Views</option>
                 </select>
                 <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" size={18} />
               </div>

@@ -318,9 +318,14 @@ CREATE TABLE IF NOT EXISTS post_comments (
     created_at TEXT
 )
 """)
+    cursor.execute("""
+CREATE TABLE IF NOT EXISTS profile_views_log (
+    viewer_id INTEGER,
+    viewed_id INTEGER,
+    viewed_at TEXT
+)
+""")
    
-
-    # 🔥 SAFETY: Add columns if DB already exists
     try:
         cursor.execute("ALTER TABLE direct_messages ADD COLUMN deleted_for_sender INTEGER DEFAULT 0")
     except:
@@ -346,6 +351,10 @@ CREATE TABLE IF NOT EXISTS post_comments (
         cursor.execute("ALTER TABLE feed_posts ADD COLUMN image TEXT")
     except:
         pass
+    try:
+        cursor.execute("ALTER TABLE users ADD COLUMN profile_views INTEGER DEFAULT 0")
+    except:
+       pass
 
     conn.commit()
     conn.close()
@@ -1263,7 +1272,8 @@ def leaderboard(credentials: HTTPAuthorizationCredentials = Depends(security)):
             skills,
             projects,
             roadmap,
-            profile_image
+            profile_image,
+            profile_views
         FROM users
     """)
     rows = cursor.fetchall()
@@ -1312,6 +1322,7 @@ def leaderboard(credentials: HTTPAuthorizationCredentials = Depends(security)):
             "projectsBuilt": len(projects),
             "modulesCompleted": modules_completed,
             "skillsMastered": len(skills),
+            "profileViews": r["profile_views"] if "profile_views" in r.keys() else 0,
 
             "badges": ["Verified"],
 
@@ -1327,29 +1338,79 @@ def leaderboard(credentials: HTTPAuthorizationCredentials = Depends(security)):
         "users": users
     }
 @app.get("/user/{user_id}")
-def get_user_profile(user_id: int):
+def get_user_profile(
+    user_id: int,
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    email = verify_token(credentials.credentials)
 
     conn = get_db()
     cursor = conn.cursor()
 
+    # 🔍 get current user id
+    cursor.execute("SELECT id FROM users WHERE email=?", (email,))
+    current = cursor.fetchone()
+
+    if not current:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    current_user_id = current["id"]
+
+    # 🔍 fetch target user
     cursor.execute("SELECT * FROM users WHERE id=?", (user_id,))
     user = cursor.fetchone()
-
-    conn.close()
 
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
+    # 👀 PROFILE VIEW LOGIC (ANTI-SPAM)
+    if current_user_id != user_id:
+
+        cursor.execute("""
+            SELECT viewed_at FROM profile_views_log
+            WHERE viewer_id=? AND viewed_id=?
+            ORDER BY viewed_at DESC LIMIT 1
+        """, (current_user_id, user_id))
+
+        last = cursor.fetchone()
+        allow = True
+
+        if last:
+            last_time = datetime.fromisoformat(last["viewed_at"])
+            if (datetime.utcnow() - last_time).total_seconds() < 600:
+                allow = False
+
+        if allow:
+            # 🔥 increment view
+            cursor.execute("""
+                UPDATE users 
+                SET profile_views = COALESCE(profile_views, 0) + 1 
+                WHERE id=?
+            """, (user_id,))
+
+            # 🧾 log view
+            cursor.execute("""
+                INSERT INTO profile_views_log (viewer_id, viewed_id, viewed_at)
+                VALUES (?, ?, ?)
+            """, (
+                current_user_id,
+                user_id,
+                datetime.utcnow().isoformat()
+            ))
+
+            conn.commit()
+
+    conn.close()
+
     user = dict(user)
 
-    # convert JSON fields properly
+    # JSON parsing
     user["skills"] = json.loads(user["skills"]) if user["skills"] else []
     user["projects"] = json.loads(user["projects"]) if user["projects"] else []
     user["certifications"] = json.loads(user["certifications"]) if user["certifications"] else []
     user["professional_links"] = json.loads(user["professional_links"]) if user["professional_links"] else []
 
     return user
-
 class SendMessage(BaseModel):
     receiver_id: int
     message: str
@@ -1578,6 +1639,41 @@ def respond_request(request_id: int, action: str, credentials: HTTPAuthorization
     conn.close()
 
     return {"message": f"Request {status}"}
+
+@app.get("/stats")
+def get_stats():
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT COUNT(*) FROM users")
+    total_users = cursor.fetchone()[0]
+
+    cursor.execute("SELECT projects, skills FROM users")
+    rows = cursor.fetchall()
+
+    total_projects = 0
+    total_skills = 0
+
+    for r in rows:
+        try:
+            projects = json.loads(r["projects"]) if r["projects"] else []
+            total_projects += len(projects)
+        except:
+            pass  # 🛡️ skip broken data safely
+
+        try:
+            skills = json.loads(r["skills"]) if r["skills"] else []
+            total_skills += len(skills)
+        except:
+            pass
+
+    conn.close()
+
+    return {
+        "totalUsers": total_users,
+        "totalProjects": total_projects,
+        "totalSkills": total_skills
+    }
 @app.get("/friends")
 def get_friends(credentials: HTTPAuthorizationCredentials = Depends(security)):
     email = verify_token(credentials.credentials)

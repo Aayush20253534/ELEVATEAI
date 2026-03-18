@@ -7,6 +7,9 @@ import {
 } from 'lucide-react';
 import { Link } from "react-router-dom";
 import logo from "../assets/logo.jpg";
+import axios from "axios";
+import img1 from "../assets/1.jpg";
+import img2 from "../assets/2.jpg";
 
 const API = import.meta.env.VITE_API_URL;
 const GlassCard = ({ children, className = "" }) => (
@@ -116,65 +119,83 @@ const Hero = () => (
   </button>
 </Link>
           <button className="flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 text-white border border-white/10 font-semibold px-8 py-3 rounded-xl transition-all">
-            <Sparkles size={18} className="text-blue-400" /> Explore Features
+            <Sparkles size={18} className="text-blue-400" /> Blue Collar Jobs
           </button>
         </div>
       </FadeIn>
 
       <FadeIn delay={0.2} className="relative hidden lg:block h-[400px]">
-        <motion.div 
-          animate={{ y: [-8, 8, -8] }} 
-          transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute top-4 right-0 w-72 bg-[#0a1120]/95 backdrop-blur-xl border border-white/10 rounded-xl p-4 shadow-2xl"
-        >
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 bg-gradient-to-tr from-cyan-400 to-blue-500 rounded-full p-[1.5px]">
-              <div className="w-full h-full bg-[#0a1120] rounded-full overflow-hidden">
-                <img src="https://i.pravatar.cc/150?u=sarah" alt="avatar" />
-              </div>
-            </div>
-            <div>
-              <h4 className="text-white font-bold text-xs">Sarah Chen</h4>
-              <p className="text-[10px] text-blue-400 font-medium">Top 1% AI Engineer</p>
-            </div>
-            <div className="ml-auto text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded text-[10px] font-bold">98</div>
-          </div>
-          <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
-            <motion.div initial={{ width: 0 }} animate={{ width: "98%" }} transition={{ duration: 1.5 }} className="h-full bg-blue-500" />
-          </div>
-        </motion.div>
+         <motion.div 
+  animate={{ y: [-8, 8, -8] }} 
+  transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
+  className="absolute top-4 right-0 w-72 bg-[#0a1120]/95 backdrop-blur-xl border border-white/10 rounded-xl p-3 shadow-2xl"
+>
+  <img 
+    src={img1} 
+    alt="preview" 
+    className="w-full h-auto rounded-lg object-cover"
+  />
+</motion.div>
 
-        <motion.div 
-          animate={{ y: [8, -8, 8] }} 
-          transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute bottom-12 left-8 w-64 bg-[#0a1120]/95 backdrop-blur-xl border border-white/10 rounded-xl p-4 shadow-2xl"
-        >
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-1.5 bg-purple-500/20 rounded-lg"><Target size={16} className="text-purple-400" /></div>
-            <h4 className="text-white font-bold text-xs">System Design</h4>
-          </div>
-          <div className="flex items-center justify-between">
-            <p className="text-[10px] text-slate-400">Verified Skills</p>
-            <div className="flex -space-x-1.5">
-              {[1,2,3].map(i => (
-                <img key={i} src={`https://i.pravatar.cc/100?img=${i+20}`} className="w-5 h-5 rounded-full border border-[#0a1120]" alt="user" />
-              ))}
-            </div>
-          </div>
-        </motion.div>
+         <motion.div 
+  animate={{ y: [8, -8, 8] }} 
+  transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
+  className="absolute bottom-12 left-8 w-64 bg-[#0a1120]/95 backdrop-blur-xl border border-white/10 rounded-xl p-3 shadow-2xl"
+>
+  <img 
+    src={img2} 
+    alt="preview" 
+    className="w-full h-auto rounded-lg object-cover"
+  />
+</motion.div>
       </FadeIn>
     </div>
   </section>
 );
 
 const Stats = () => {
-  const stats = [
-    { label: "Professionals", value: "12k+", icon: Users },
-    { label: "Projects Built", value: "3.5k+", icon: Code2 },
+  const [stats, setStats] = useState([
+    { label: "Professionals", value: "...", icon: Users },
+    { label: "Projects Built", value: "...", icon: Code2 },
     { label: "Companies", value: "850+", icon: Briefcase },
     { label: "Countries", value: "45", icon: Globe },
-  ];
+  ]);
 
+  useEffect(() => {
+  const fetchStats = async () => {
+    try {
+      const res = await axios.get(`${API}/stats`);
+
+      setStats([
+  {
+    label: "Professionals",
+    value: `${res.data.totalUsers}+`,
+    icon: Users
+  },
+  {
+    label: "Projects Built",
+    value: `${res.data.totalProjects}+`,
+    icon: Code2
+  },
+  {
+    label: "Skills Verified",
+    value: `${res.data.totalSkills}+`,
+    icon: Shield
+  },
+  {
+    label: "Top Talent",
+    value: "Top 1%",
+    icon: Star
+  }
+]);
+
+    } catch (err) {
+      console.error("Stats fetch error:", err);
+    }
+  };
+
+  fetchStats();
+}, []);
   return (
     <section className="py-10 border-y border-white/5 bg-white/[0.01]">
       <div className="max-w-7xl mx-auto px-6">
