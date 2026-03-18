@@ -46,7 +46,8 @@ const Sidebar = () => {
   { name: "Interview", icon: Mic2, path: "/Interview" },
   { name: "Profile", icon: User, path: "/profile" },
   { name: "Leaderboard", icon: Trophy, path: "/leaderboard" },
-  { name: "Messages", icon: MessageSquare, path: "/messages" }
+  { name: "Messages", icon: MessageSquare, path: "/messages" },
+  { name: "Feed", icon: Sparkles, path: "/feed" }
 ];
 
   return (

@@ -15,6 +15,7 @@ import AboutPage from "./components/About";
 import LegalPage from "./components/Policy";
 import PlatformPage from "./components/Platform";
 import ElevateAIChat from "./pages/messages";
+import ElevateFeed from "./pages/feed";
 
 const ProtectedRoute = ({ children }) => {
   const user = localStorage.getItem("user");
@@ -124,6 +125,14 @@ function App() {
           </ProtectedRoute>
         }
       /> 
+      <Route
+  path="/feed"
+  element={
+    <ProtectedRoute>
+      <ElevateFeed />
+    </ProtectedRoute>
+  }
+/>
       <Route
   path="/chat/:receiver_id"
   element={

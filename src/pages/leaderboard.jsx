@@ -42,6 +42,8 @@ const RankBadge = ({ rank }) => {
 
 const UserCard = ({ user, rank, onClick, navigate, currentUser }) => {
   const isSelf = String(currentUser?.id) === String(user.id);
+  const isFriend = user.isFriend;
+  const [sent, setSent] = useState(user.requestSent || false);
 
   return (
   <motion.div
@@ -124,25 +126,48 @@ const UserCard = ({ user, rank, onClick, navigate, currentUser }) => {
 
 <div className="flex gap-2">
   {isSelf ? (
-    <div className="px-4 py-3 rounded-xl bg-gray-800 text-gray-500 border border-gray-700 text-sm font-bold">
-      You
-    </div>
+    <div className="w-[110px]" />  // empty space
+  ) : isFriend ? (
+    <div
+  onClick={(e) => e.stopPropagation()}
+  className="px-4 py-3 rounded-xl bg-green-600/20 text-green-400 border border-green-500/30 text-sm font-bold"
+>
+  Friend
+</div>
   ) : (
-    <button
-      onClick={(e) => {
-        e.stopPropagation();
-        navigate(`/chat/${user.id}`);
-      }}
-      className="p-3 rounded-xl bg-white/5 hover:bg-blue-500/20 text-gray-400 hover:text-blue-400 transition-all border border-white/10 hover:border-blue-500/40"
-    >
-      <MessageSquare size={18} />
-    </button>
-  )}
-      <button className="flex items-center gap-2 px-5 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm transition-all shadow-lg shadow-blue-600/20">
-        <UserPlus size={18} />
-        <span className="hidden sm:inline">Connect</span>
+    <>
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          navigate(`/chat/${user.id}`);
+        }}
+        className="p-3 rounded-xl bg-white/5 hover:bg-blue-500/20 text-gray-400 hover:text-blue-400 transition-all border border-white/10 hover:border-blue-500/40"
+      >
+        <MessageSquare size={18} />
       </button>
-    </div>
+
+      <button
+        disabled={sent}
+        onClick={(e) => {
+          e.stopPropagation();
+          axios.post(`${API}/friends/request/${user.id}`, {}, {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`
+            }
+          })
+          .then(() => setSent(true))
+          .catch(() => setSent(true));
+        }}
+        className={`flex items-center gap-2 px-5 py-3 rounded-xl text-white transition ${
+          sent ? "bg-gray-600 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-500"
+        }`}
+      >
+        <UserPlus size={18} />
+        {sent ? "Sent" : "Connect"}
+      </button>
+    </>
+  )}
+</div>
   </motion.div>
 );
 };
@@ -160,7 +185,11 @@ const LeaderboardPage = () => {
   useEffect(() => {
     const fetchLeaderboard = async () => {
       try {
-        const res = await axios.get(`${API}/api/leaderboard`);
+        const res = await axios.get(`${API}/api/leaderboard`, {
+  headers: {
+    Authorization: `Bearer ${localStorage.getItem("token")}`
+  }
+});
         const rawUsers = res.data?.users || [];
         const processedUsers = rawUsers.map(u => {
           const p = u.projectsBuilt || 0;
@@ -292,7 +321,7 @@ const LeaderboardPage = () => {
             <AnimatePresence mode="popLayout">
               {filteredUsers.map((user, index) => (
                 <UserCard
-                  key={user.id}
+                  key={user.id || user.name}
                   user={user}
                   rank={index + 1}
                   onClick={() => navigate(`/profile/${user.id}`)}
