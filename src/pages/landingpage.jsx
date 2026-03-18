@@ -8,6 +8,7 @@ import {
 import { Link } from "react-router-dom";
 import logo from "../assets/logo.jpg";
 
+const API = import.meta.env.VITE_API_URL;
 const GlassCard = ({ children, className = "" }) => (
   <motion.div 
     whileHover={{ 

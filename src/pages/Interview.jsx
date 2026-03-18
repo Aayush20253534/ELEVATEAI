@@ -14,6 +14,7 @@ import {
 import Sidebar from '../components/sidebar';
 import Header from '../components/header';
 
+const API = import.meta.env.VITE_API_URL;
 const Badge = ({ children, variant = 'default' }) => {
   const styles = {
     default: "bg-white/10 text-slate-300",
@@ -154,7 +155,7 @@ export default function InterviewSimulator() {
     if (!targetJob.trim()) return;
     setIsStarting(true);
     try {
-      const res = await fetch("http://localhost:8000/interview/start", {
+      const res = await fetch(`${API}/interview/start`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -190,7 +191,7 @@ export default function InterviewSimulator() {
     formData.append("answer", answer);
     formData.append("video", videoBlob, "recording.webm");
     
-    const res = await fetch("http://localhost:8000/interview/submit", {
+    const res = await fetch(`${API}/interview/submit`, {
       method: "POST",
       body: formData
     });

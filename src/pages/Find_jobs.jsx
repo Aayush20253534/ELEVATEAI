@@ -14,6 +14,7 @@ import {
 import Sidebar from "../components/sidebar";
 import axios from "axios";
 
+const API = import.meta.env.VITE_API_URL;
 const FindJobs = () => {
   const location = useLocation();
   const [loading, setLoading] = useState(false);
@@ -40,7 +41,7 @@ useEffect(() => {
 
     const token = localStorage.getItem("token");
 
-    axios.get("http://127.0.0.1:8000/me", {
+    axios.get(`${API}/me`, {
       headers: { Authorization: `Bearer ${token}` }
     })
     .then(res => {
@@ -76,7 +77,7 @@ useEffect(() => {
     setLoading(true);
 
     try {
-      const res = await fetch("http://localhost:8000/jobs");
+      const res = await fetch(`${API}/jobs`);
       const data = await res.json();
 
       const formattedJobs = (data.jobs || []).map((job, i) => ({
@@ -105,7 +106,7 @@ const autoSearch = async (jobTitle) => {
   setLoading(true);
 
   try {
-    const res = await fetch("http://localhost:8000/jobs/search", {
+    const res = await fetch(`${API}/jobs/search`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -151,7 +152,7 @@ const autoSearch = async (jobTitle) => {
     setLoading(true);
 
     try {
-      const res = await fetch("http://localhost:8000/jobs/search", {
+      const res = await fetch(`${API}/jobs/search`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

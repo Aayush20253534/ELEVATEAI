@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import Sidebar from '../components/sidebar.jsx';
 
+const API = import.meta.env.VITE_API_URL;
 const Card = ({ children, title, icon: Icon }) => (
   <motion.div
     whileHover={{ y: -1, boxShadow: '0 10px 30px -10px rgba(255,255,255,0.03)' }}
@@ -113,7 +114,7 @@ const isResumeValid =
   const token = localStorage.getItem("token");
   if (!token) return;
 
-  axios.get("http://127.0.0.1:8000/me", {
+ axios.get(`${API}/me`, {
     headers: {
       Authorization: `Bearer ${token}`
     }

@@ -28,6 +28,7 @@ from models import InterviewStart, InterviewAnswer
 from chatbot_service import ask_bot
 from web_scraping import LinkedInScraper, NaukriScraper, SerpApiScraper
 
+
 app = FastAPI()
 roadmap_engine = Roadmap()
 app.mount("/images", StaticFiles(directory="profile_images"), name="images")
@@ -202,7 +203,7 @@ You will be provided with the user's resume content. Analyze it and produce the 
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origin_regex="https://.*\\.trycloudflare\\.com",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -1029,7 +1030,8 @@ def leaderboard():
             current_role,
             skills,
             projects,
-            roadmap
+            roadmap,
+            profile_image
         FROM users
     """)
 
@@ -1061,6 +1063,7 @@ def leaderboard():
             "name": r["name"],
             "role": r["current_role"] or "Developer",
             "location": "Global",
+            "profile_image": r["profile_image"],
 
             "projectsBuilt": len(projects),
             "modulesCompleted": modules_completed,
@@ -1234,7 +1237,7 @@ def get_inbox(credentials: HTTPAuthorizationCredentials = Depends(security)):
     for r in rows:
         other_id = r["other_user_id"]
 
-        cursor.execute("SELECT id, name FROM users WHERE id=?", (other_id,))
+        cursor.execute("SELECT id, name, profile_image FROM users WHERE id=?", (other_id,))
         user_data = cursor.fetchone()
 
         cursor.execute("""
@@ -1256,15 +1259,16 @@ def get_inbox(credentials: HTTPAuthorizationCredentials = Depends(security)):
             continue  # 🚨 skip empty chats
 
         conversations.append({
-            "user_id": user_data["id"],
-            "name": user_data["name"],
-            "last_message": (
-    last_msg["message"] 
-    if last_msg["message"] 
-    else f"📎 {last_msg['file_type'] or 'File'}"
-),
-            "last_sender_id": last_msg["sender_id"]
-        })
+    "user_id": user_data["id"],
+    "name": user_data["name"],
+    "profile_image": user_data["profile_image"] or "", 
+    "last_message": (
+        last_msg["message"] 
+        if last_msg["message"] 
+        else f"📎 {last_msg['file_type'] or 'File'}"
+    ),
+    "last_sender_id": last_msg["sender_id"]
+})
 
     conn.close()
     return conversations
@@ -1364,17 +1368,22 @@ def get_messages(user_id: int,
         raise HTTPException(status_code=400, detail="Invalid conversation")
 
     cursor.execute("""
-        SELECT * FROM direct_messages
-        WHERE 
-        (
-            sender_id=? AND receiver_id=? AND deleted_for_sender=0
-        )
-        OR
-        (
-            sender_id=? AND receiver_id=? AND deleted_for_receiver=0
-        )
-        ORDER BY created_at ASC
-    """, (current_user_id, user_id, user_id, current_user_id))
+SELECT 
+    dm.*,
+    u.profile_image,
+    u.name as sender_name
+FROM direct_messages dm
+JOIN users u ON dm.sender_id = u.id
+WHERE 
+(
+    dm.sender_id=? AND dm.receiver_id=? AND dm.deleted_for_sender=0
+)
+OR
+(
+    dm.sender_id=? AND dm.receiver_id=? AND dm.deleted_for_receiver=0
+)
+ORDER BY dm.created_at ASC
+""", (current_user_id, user_id, user_id, current_user_id))
 
     messages = cursor.fetchall()
     conn.close()

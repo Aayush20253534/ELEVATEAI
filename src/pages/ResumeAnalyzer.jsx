@@ -12,6 +12,7 @@ import {
 import Header from '../components/header';
 import Sidebar from '../components/sidebar';
 
+const API = import.meta.env.VITE_API_URL;
 const GlassCard = ({ children, className = "" }) => (
   <motion.div
     initial={{ opacity: 0, y: 20 }}
@@ -71,7 +72,7 @@ useEffect(() => {
   const token = localStorage.getItem("token");
   if (!token) return;
 
-  axios.get("http://localhost:8000/me", {
+  axios.get(`${API}/me`, {
     headers: { Authorization: `Bearer ${token}` }
   })
   .then(res => {

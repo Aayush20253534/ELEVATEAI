@@ -9,6 +9,7 @@ import {
 import Sidebar from '../components/sidebar';
 import { useNavigate } from "react-router-dom";
 
+const API = import.meta.env.VITE_API_URL;
 const StatCard = ({ label, value, icon: Icon, colorClass }) => (
   <motion.div 
     initial={{ opacity: 0, y: 10 }}
@@ -57,9 +58,19 @@ const UserCard = ({ user, rank, onClick, navigate, currentUser }) => {
       <RankBadge rank={rank} />
       <div className="relative">
         <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 p-[2px]">
-          <div className="w-full h-full rounded-2xl bg-gray-900 flex items-center justify-center text-xl font-bold text-white">
-            {user.name?.charAt(0)}
-          </div>
+          <div className="w-full h-full rounded-2xl bg-gray-900 overflow-hidden flex items-center justify-center">
+  {user.profile_image ? (
+    <img
+      src={`${API}${user.profile_image}`}
+      alt="pfp"
+      className="w-full h-full object-cover"
+    />
+  ) : (
+    <span className="text-xl font-bold text-white">
+      {user.name?.charAt(0)}
+    </span>
+  )}
+</div>
         </div>
         {user.badges?.includes("Verified") && (
           <CheckCircle2 className="absolute -bottom-1 -right-1 text-blue-400 fill-[#050b14]" size={18} />
@@ -149,7 +160,7 @@ const LeaderboardPage = () => {
   useEffect(() => {
     const fetchLeaderboard = async () => {
       try {
-        const res = await axios.get("http://localhost:8000/api/leaderboard");
+        const res = await axios.get(`${API}/api/leaderboard`);
         const rawUsers = res.data?.users || [];
         const processedUsers = rawUsers.map(u => {
           const p = u.projectsBuilt || 0;
@@ -176,7 +187,7 @@ const LeaderboardPage = () => {
   useEffect(() => {
   const fetchMe = async () => {
     try {
-      const res = await axios.get("http://localhost:8000/me", {
+      const res = await axios.get(`${API}/me`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`
         }

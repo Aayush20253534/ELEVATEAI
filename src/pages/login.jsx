@@ -3,6 +3,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
+const API = import.meta.env.VITE_API_URL;
 const Icons = {
   User: () => (
     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -158,7 +159,7 @@ function Login() {
 
       if(isSignup){
 
-        await axios.post("http://localhost:8000/signup",{
+        await axios.post(`${API}/signup`,{
           name: form.name,
           linkedin: form.linkedin,
           email: form.email,
@@ -171,7 +172,7 @@ function Login() {
         return;
       }
 
-      const res = await axios.post("http://localhost:8000/login",{
+      const res = await axios.post(`${API}/login`,{
         email:form.email,
         password:form.password
       });
@@ -351,6 +352,7 @@ function Login() {
     </div>
   );
 }
+console.log("API:", API);
 
 export default Login;
 

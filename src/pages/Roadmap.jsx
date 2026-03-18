@@ -10,7 +10,7 @@ import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import Sidebar from '../components/sidebar';
 
-
+const API = import.meta.env.VITE_API_URL;
 const ROLE_SKILLS = {
   "AI Engineer": ["Python", "PyTorch", "Transformers", "MLOps", "Deep Learning"],
   "Backend Developer": ["Node.js", "Databases", "API Design", "Docker", "System Design"],
@@ -47,7 +47,7 @@ const SkillRoadmap = () => {
 
   if (location.state?.trigger === "resume") {
 
-    axios.get("http://127.0.0.1:8000/me", {
+    axios.get(`${API}/me`, {
       headers: { Authorization: `Bearer ${token}` }
     })
     .then(res => {
@@ -70,13 +70,13 @@ const SkillRoadmap = () => {
     }
 
 
- axios.get("http://127.0.0.1:8000/me", {
+ axios.get(`${API}/me`, {
   headers: { Authorization: `Bearer ${token}` }
 })
 .then(res => setUser(res.data))
 .catch(err => console.error(err));
 
-axios.get("http://127.0.0.1:8000/roadmap/user", {
+axios.get(`${API}/roadmap/user`, {
   headers: { Authorization: `Bearer ${token}` }
 })
 .then(res => {
@@ -261,13 +261,13 @@ useEffect(() => {
 
     const token = localStorage.getItem("token");
 
-await axios.post(
-  "http://127.0.0.1:8000/roadmap/save",
+await 
+axios.post(`${API}/roadmap/save`,
   { roadmap: formatted },
   { headers: { Authorization: `Bearer ${token}` } }
 );
 
-const userRes = await axios.get("http://127.0.0.1:8000/me", {
+const userRes = await axios.get(`${API}/me`, {
   headers: { Authorization: `Bearer ${token}` }
 });
 setUser(userRes.data);

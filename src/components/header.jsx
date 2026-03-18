@@ -2,28 +2,25 @@ import React, { useEffect, useState } from "react";
 import { Search, Bell, User } from "lucide-react";
 import axios from "axios";
 
+const API = import.meta.env.VITE_API_URL;
+
 const Header = () => {
 
   const [user, setUser] = useState(null);
 
-  useEffect(() => {
-    const token = localStorage.getItem("token");
+ useEffect(() => {
+  const token = localStorage.getItem("token");
 
-    if(token){
-      axios.get("http://127.0.0.1:8000/me", {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      })
-      .then(res => {
-        setUser(res.data);
-      })
-      .catch(err => {
-        console.log(err);
-      });
-    }
-
-  }, []);
+  if (token) {
+    axios.get(`${API}/me`, {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    })
+    .then(res => setUser(res.data))
+    .catch(err => console.log(err));
+  }
+}, [API]);
 
   return (
     <header className="h-20 border-b border-white/5 flex items-center px-8 sticky top-0 bg-[#050b14]/80 backdrop-blur-md z-20">

@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import Sidebar from '../components/sidebar';
 
+const API = import.meta.env.VITE_API_URL;
 const EMOJIS = [
   "😀","😂","🤣","😍","❤️",
   "🔥","👍","👏","😎","💯",
@@ -65,17 +66,35 @@ const formatTime = (ts) => {
   });
 };
 
-const MessageBubble = ({ message, isMe, onDelete, searchQuery, theme }) => {
+const MessageBubble = ({ message, isMe, onDelete, searchQuery, theme, navigate }) => {
   const [showMenu, setShowMenu] = useState(false);
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10, scale: 0.96 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      className={`flex w-full mb-2 group ${
-        isMe ? "justify-end" : "justify-start"
-      }`}
-    >
+   <motion.div
+  initial={{ opacity: 0, y: 10, scale: 0.96 }}
+  animate={{ opacity: 1, y: 0, scale: 1 }}
+  className={`flex w-full mb-2 gap-2 ${
+    isMe ? "justify-end" : "justify-start"
+  }`}
+>
+  {/* 👤 Avatar */}
+{!isMe && (
+  <div
+    onClick={() => navigate(`/profile/${message.sender_id}`)}
+    className="w-9 h-9 rounded-full overflow-hidden bg-slate-700 flex items-center justify-center cursor-pointer"
+  >
+    {message.profile_image ? (
+      <img
+        src={`${API}${message.profile_image}`}
+        className="w-full h-full object-cover"
+      />
+    ) : (
+      <span className="text-xs text-white font-bold">
+        {message.sender_name?.charAt(0) || "U"}
+      </span>
+    )}
+  </div>
+)}
       <div
   className={`relative max-w-[65%] md:max-w-[55%] lg:max-w-[48%] px-4 py-2.5 shadow-sm transition-all duration-200 ${
           isMe
@@ -128,7 +147,7 @@ const MessageBubble = ({ message, isMe, onDelete, searchQuery, theme }) => {
                 src={
                   message.file_url.startsWith("blob:")
                     ? message.file_url
-                    : `http://localhost:8000${message.file_url}`
+                    : `${API}${message.file_url}`
                 }
                 className="rounded-lg max-w-[200px]"
               />
@@ -141,7 +160,7 @@ const MessageBubble = ({ message, isMe, onDelete, searchQuery, theme }) => {
                 src={
                   message.file_url.startsWith("blob:")
                     ? message.file_url
-                    : `http://localhost:8000${message.file_url}`
+                    : `${API}${message.file_url}`
                 }
               />
             )}
@@ -152,7 +171,7 @@ const MessageBubble = ({ message, isMe, onDelete, searchQuery, theme }) => {
                 src={
                   message.file_url.startsWith("blob:")
                     ? message.file_url
-                    : `http://localhost:8000${message.file_url}`
+                    : `${API}${message.file_url}`
                 }
               />
             )}
@@ -161,7 +180,7 @@ const MessageBubble = ({ message, isMe, onDelete, searchQuery, theme }) => {
               !message.file_type?.startsWith("video") &&
               !message.file_type?.startsWith("audio") && (
                <a
-  href={`http://localhost:8000${message.file_url}`}
+  href={`${API}${message.file_url}`}
   target="_blank"
   rel="noreferrer"
   className="flex items-center gap-2 bg-black/20 hover:bg-black/30 transition px-2 py-1 rounded-md text-xs text-blue-300 w-fit max-w-[200px]"
@@ -196,16 +215,34 @@ const MessageBubble = ({ message, isMe, onDelete, searchQuery, theme }) => {
 };
 
 
-const ContactItem = ({ chat, isActive, onClick, currentUserId }) => (
+const ContactItem = ({ chat, isActive, onClick, currentUserId, navigate }) => (
   <div 
     onClick={onClick}
     className={`flex items-center gap-3 p-3 cursor-pointer transition-all duration-200 border-b border-slate-800/40
       ${isActive ? 'bg-slate-800/60 border-l-4 border-l-blue-500' : 'hover:bg-slate-800/30'}`}
   >
     <div className="relative">
-      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-slate-700 to-slate-800 flex items-center justify-center text-white font-semibold border border-slate-700">
-        {chat.name?.charAt(0) || '?'}
-      </div>
+      <div
+  onClick={(e) => {
+    e.stopPropagation();
+    navigate(`/profile/${chat.user_id}`);
+  }}
+  className="w-12 h-12 rounded-full overflow-hidden bg-slate-700 flex items-center justify-center cursor-pointer"
+>
+ {chat.profile_image && chat.profile_image !== "null" ? (
+  <img
+    src={`${API}${chat.profile_image}`}
+    className="w-full h-full object-cover"
+    onError={(e) => {
+      e.target.style.display = "none";
+    }}
+  />
+) : (
+  <span className="text-white font-semibold">
+    {chat.name?.charAt(0) || "?"}
+  </span>
+)}
+</div>
       {chat.online && <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-[#050b14] rounded-full" />}
     </div>
     <div className="flex-1 min-w-0">
@@ -279,7 +316,7 @@ useEffect(() => {
   useEffect(() => {
     const fetchInbox = async () => {
       try {
-        const res = await axios.get("http://localhost:8000/messages/inbox", {
+        const res = await axios.get(`${API}/messages/inbox`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         setInbox(res.data);
@@ -295,7 +332,7 @@ useEffect(() => {
 
   const fetchUser = async () => {
     try {
-      const res = await axios.get(`http://localhost:8000/user/${receiver_id}`);
+      const res = await axios.get(`${API}/user/${receiver_id}`);
       setReceiver(res.data);
     } catch (err) {
       console.error("User fetch error", err);
@@ -310,7 +347,7 @@ useEffect(() => {
     if (!receiver_id) return;
     const fetchChat = async () => {
       try {
-        const res = await axios.get(`http://localhost:8000/messages/${receiver_id}`, {
+        const res = await axios.get(`${API}/messages/${receiver_id}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
 setMessages(
@@ -333,7 +370,7 @@ setMessages(
 }, [messages.length]);
 const handleDelete = async (id, isMe) => {
   try {
-    await axios.delete(`http://localhost:8000/messages/${id}`, {
+    await axios.delete(`${API}/messages/${id}`, {
       params: {
         delete_for_everyone: isMe === true
       },
@@ -387,7 +424,7 @@ const handleDelete = async (id, isMe) => {
   try {
     // 🚀 send message to backend
     await axios.post(
-      "http://localhost:8000/messages/send",
+      `${API}/messages/send`,
       formData,
       {
         headers: {
@@ -402,7 +439,7 @@ const handleDelete = async (id, isMe) => {
 
     // 🔥 refresh messages instantly (no delay feeling)
     const resChat = await axios.get(
-      `http://localhost:8000/messages/${receiver_id}`,
+      `${API}/messages/${receiver_id}`,
       {
         headers: { Authorization: `Bearer ${token}` },
       }
@@ -417,7 +454,7 @@ const handleDelete = async (id, isMe) => {
 
     // 🔄 refresh inbox
     const resInbox = await axios.get(
-      "http://localhost:8000/messages/inbox",
+      `${API}/messages/inbox`,
       {
         headers: { Authorization: `Bearer ${token}` },
       }
@@ -481,6 +518,7 @@ const filteredMessages = messages.filter((msg) => {
                 isActive={receiver_id === String(chat.user_id)}
                 onClick={() => navigate(`/chat/${chat.user_id}`)}
                 currentUserId={currentUserId}
+                navigate={navigate}
               />
             ))}
           </div>
@@ -494,9 +532,24 @@ const filteredMessages = messages.filter((msg) => {
               <header className={`h-16 flex items-center justify-between px-4 ${currentTheme.panel} bg-opacity-50 backdrop-blur-md border-b border-slate-800/50 z-30`}>
                 <div className="flex items-center gap-3">
                   <button onClick={() => navigate('/messages')} className="md:hidden p-1 text-slate-400"><ChevronLeft /></button>
-                  <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold">
-                    {receiver?.name?.charAt(0) || 'U'}
-                  </div>
+                  <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-700 flex items-center justify-center">
+  {receiver?.profile_image && receiver.profile_image !== "null" ? (
+    <img
+      src={`${API}${receiver.profile_image}`}
+      className="w-full h-full object-cover"
+      onError={(e) => {
+        e.target.style.display = "none";
+        e.target.parentNode.innerHTML = `<span class="text-white font-bold">
+          ${receiver?.name?.charAt(0) || "U"}
+        </span>`;
+      }}
+    />
+  ) : (
+    <span className="text-white font-bold">
+      {receiver?.name?.charAt(0) || "U"}
+    </span>
+  )}
+</div>
                   <div>
                     <h2 className="text-sm font-bold text-white leading-tight">{receiver?.name || `User ${receiver_id}`}</h2>
                     <span className="text-[11px] text-emerald-500 font-medium">online</span>
@@ -557,6 +610,7 @@ const filteredMessages = messages.filter((msg) => {
   onDelete={handleDelete}
   searchQuery={searchQuery}
   theme={currentTheme}
+  navigate={navigate}
 />
                   ))}
                 </AnimatePresence>

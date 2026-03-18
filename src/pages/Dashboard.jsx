@@ -20,6 +20,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Sidebar from '../components/sidebar.jsx';
 import { useNavigate } from "react-router-dom";
 
+const API = import.meta.env.VITE_API_URL;
+
 const StatCard = ({ icon: Icon, label, value, color }) => (
   <motion.div
     whileHover={{ y: -4 }}
@@ -111,7 +113,7 @@ const upcomingSkills = nextStage
       return;
     }
 
-    axios.get("http://127.0.0.1:8000/me", {
+    axios.get(`${API}/me`, {
       headers: { Authorization: `Bearer ${token}` }
     })
       .then(res => setUser(res.data))
@@ -134,7 +136,7 @@ const upcomingSkills = nextStage
 
   try {
     const res = await axios.post(
-      "http://127.0.0.1:8000/ai/chat",
+      `${API}/ai/chat`,
       { message: activePrompt },
       { headers: { Authorization: `Bearer ${token}` } }
     );
@@ -184,7 +186,7 @@ const upcomingSkills = nextStage
 useEffect(() => {
   const token = localStorage.getItem("token");
 
-  axios.get("http://127.0.0.1:8000/ai/history", {
+  axios.get(`${API}/ai/history`, {
     headers: { Authorization: `Bearer ${token}` }
   })
   .then(res => {

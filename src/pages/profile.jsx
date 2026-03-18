@@ -11,6 +11,7 @@ import Sidebar from '../components/sidebar';
 import axios from "axios";
 import { useParams } from "react-router-dom";
 
+const API = import.meta.env.VITE_API_URL;
 const GlassCard = ({ children, className = "" }) => (
   <motion.div
     initial={{ opacity: 0, y: 20 }}
@@ -253,29 +254,27 @@ const ProfilePage = () => {
   setResume(data.resume || null);
 };
 
-  const API_BASE = "http://127.0.0.1:8000";
-
   useEffect(() => {
 
   const token = localStorage.getItem("token");
 
   // viewing another user's profile
   if (id) {
-    axios.get(`${API_BASE}/user/${id}`)
+    axios.get(`${API}/user/${id}`)
       .then(res => loadUser(res.data))
       .catch(err => console.error("Error fetching user:", err));
   }
 
   // viewing your own profile
   else if (token) {
-    axios.get(`${API_BASE}/me`, {
+    axios.get(`${API}/me`, {
       headers: { Authorization: `Bearer ${token}` }
     })
       .then(res => loadUser(res.data))
       .catch(err => console.error("Error fetching profile:", err));
   }
 
-}, [id, API_BASE]);
+}, [id, API]);
 
   const saveProfile = async () => {
     const token = localStorage.getItem("token");
@@ -283,7 +282,7 @@ const ProfilePage = () => {
 
     try {
       await axios.post(
-  `${API_BASE}/profile/update`,
+  `${API}/profile/update`,
   {
     name,
     username,
@@ -313,7 +312,7 @@ const ProfilePage = () => {
     formData.append("file", file);
 
     try {
-      const res = await axios.post(`${API_BASE}${endpoint}`, formData, {
+      const res = await axios.post(`${API}${endpoint}`, formData, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "multipart/form-data"
@@ -348,7 +347,7 @@ const ProfilePage = () => {
             <div className="group relative h-48 w-full rounded-3xl border border-white/10 overflow-hidden bg-gradient-to-r from-blue-900/40 via-purple-900/40 to-black">
               {coverImage && (
                 <img
-                  src={`http://127.0.0.1:8000${coverImage}`}
+                  src={`${API}${coverImage}`}
                   alt="Cover"
                   className="w-full h-full object-cover"
                 />
@@ -379,7 +378,7 @@ const ProfilePage = () => {
                 <div className="w-32 h-32 rounded-3xl overflow-hidden border-4 border-[#050b14] shadow-2xl bg-gray-800 flex items-center justify-center">
                   {image ? (
                     <img
-                      src={`http://127.0.0.1:8000${image}`}
+                      src={`${API}${image}`}
                       className="w-full h-full object-cover"
                       loading="lazy"
                     />
@@ -498,7 +497,7 @@ const ProfilePage = () => {
       <div className="flex gap-3 mt-2">
 
         <a
-          href={`${API_BASE}${resume}`}
+          href={`${API}${resume}`}
           target="_blank"
           className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs rounded-lg transition"
         >
