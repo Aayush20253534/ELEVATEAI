@@ -4,7 +4,6 @@ import { useNavigate, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
   FileText,
-  Briefcase,
   Map,
   Mic2,
   User,
@@ -14,12 +13,15 @@ import {
   Trophy,
   PanelLeft,
   MessageSquare
-
 } from "lucide-react";
+import axios from "axios";
 
 const Sidebar = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const [requestCount, setRequestCount] = useState(0);
+  const API = import.meta.env.VITE_API_URL;
+  const token = localStorage.getItem("token");
 
   const [expanded, setExpanded] = useState(() => {
     const saved = localStorage.getItem("sidebar-expanded");
@@ -37,39 +39,55 @@ const Sidebar = () => {
     );
   }, []);
 
- const navItems = [
-  { name: "Dashboard", icon: LayoutDashboard, path: "/Dashboard" },
-  { name: "Resume Analyzer", icon: FileText, path: "/ResumeAnalyzer" },
-  { name: "Find Jobs", icon: Search, path: "/Find_jobs" },
-  { name: "Resume Builder", icon: FileEdit, path: "/ResumeBuilder" },
-  { name: "Skill Roadmap", icon: Map, path: "/Roadmap" },
-  { name: "Interview", icon: Mic2, path: "/Interview" },
-  { name: "Profile", icon: User, path: "/profile" },
-  { name: "Leaderboard", icon: Trophy, path: "/leaderboard" },
-  { name: "Messages", icon: MessageSquare, path: "/messages" },
-  { name: "Feed", icon: Sparkles, path: "/feed" }
-];
+  useEffect(() => {
+    const fetchRequests = async () => {
+      try {
+        const res = await axios.get(`${API}/friends/requests`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setRequestCount(res.data.length);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+
+    fetchRequests();
+    const interval = setInterval(fetchRequests, 5000);
+    return () => clearInterval(interval);
+  }, [token]);
+
+  const navItems = [
+    { name: "Dashboard", icon: LayoutDashboard, path: "/Dashboard" },
+    { name: "Resume Analyzer", icon: FileText, path: "/ResumeAnalyzer" },
+    { name: "Find Jobs", icon: Search, path: "/Find_jobs" },
+    { name: "Resume Builder", icon: FileEdit, path: "/ResumeBuilder" },
+    { name: "Skill Roadmap", icon: Map, path: "/Roadmap" },
+    { name: "Interview", icon: Mic2, path: "/Interview" },
+    { name: "Profile", icon: User, path: "/profile" },
+    { name: "Leaderboard", icon: Trophy, path: "/leaderboard" },
+    { name: "Messages", icon: MessageSquare, path: "/messages" },
+    { name: "Feed", icon: Sparkles, path: "/feed" }
+  ];
 
   return (
-<motion.aside
-  animate={{ width: expanded ? 220 : 68 }}
-  transition={{ duration: 0.25 }}
-  onUpdate={(latest) => {
-    document.documentElement.style.setProperty(
-      "--sidebar-width",
-      `${latest.width}px`
-    );
-  }}
-  className="fixed left-0 top-0 h-screen border-r border-white/5 bg-black/30 backdrop-blur-xl flex flex-col px-3 py-4 z-50"
->
-
+    <motion.aside
+      animate={{ width: expanded ? 220 : 68 }}
+      transition={{ duration: 0.25 }}
+      onUpdate={(latest) => {
+        document.documentElement.style.setProperty(
+          "--sidebar-width",
+          `${latest.width}px`
+        );
+      }}
+      className="fixed left-0 top-0 h-screen border-r border-white/5 bg-black/30 backdrop-blur-xl flex flex-col px-3 py-4 z-50"
+    >
       <div
         onClick={() => navigate("/Dashboard")}
         className="flex items-center gap-3 mb-8 cursor-pointer px-2"
       >
-          <div className="p-2 bg-gradient-to-br from-cyan-500 to-violet-600 rounded-lg">
-           <Sparkles className="w-5 h-5 text-white" />
-          </div>
+        <div className="p-2 bg-gradient-to-br from-cyan-500 to-violet-600 rounded-lg">
+          <Sparkles className="w-5 h-5 text-white" />
+        </div>
 
         {expanded && (
           <h1 className="text-lg font-bold text-white tracking-tight">
@@ -100,6 +118,16 @@ const Sidebar = () => {
                 </span>
               )}
 
+              {item.name === "Messages" && requestCount > 0 && (
+                <span
+                  className={`absolute text-[10px] px-1.5 py-0.5 rounded-full bg-green-500 text-white font-bold ${
+                    expanded ? "top-1 right-2" : "-top-1 -right-1"
+                  }`}
+                >
+                  +{requestCount}
+                </span>
+              )}
+
               {isActive && (
                 <motion.div
                   layoutId="activeGlow"
@@ -117,7 +145,6 @@ const Sidebar = () => {
       >
         <PanelLeft size={14} />
       </button>
-
     </motion.aside>
   );
 };

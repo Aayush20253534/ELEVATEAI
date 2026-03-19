@@ -258,7 +258,6 @@ const ProfilePage = () => {
 
   const token = localStorage.getItem("token");
 
-  // viewing another user's profile
   if (id) {
     axios.get(`${API}/user/${id}`, {
   headers: {
@@ -269,7 +268,6 @@ const ProfilePage = () => {
       .catch(err => console.error("Error fetching user:", err));
   }
 
-  // viewing your own profile
   else if (token) {
     axios.get(`${API}/me`, {
       headers: { Authorization: `Bearer ${token}` }
@@ -309,7 +307,39 @@ const ProfilePage = () => {
       setSaving(false);
     }
   };
+const handleChangePassword = async () => {
+  const current_password = prompt("Enter current password");
+  const new_password = prompt("Enter new password");
+  const confirm_password = prompt("Confirm new password");
 
+  if (!current_password || !new_password || !confirm_password) return;
+
+  if (new_password !== confirm_password) {
+    alert("Passwords do not match");
+    return;
+  }
+
+if (new_password.length < 6) {
+  alert("Password must be at least 6 characters");
+  return;
+}
+
+  try {
+    await axios.post(
+      `${API}/change-password`,
+      { current_password, new_password },
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`
+        }
+      }
+    );
+
+    alert("Password updated successfully");
+  } catch (err) {
+    alert(err.response?.data?.detail || "Error updating password");
+  }
+};
   const uploadFile = async (file, endpoint, setter) => {
     const token = localStorage.getItem("token");
     const formData = new FormData();
@@ -548,15 +578,12 @@ const ProfilePage = () => {
               <GlassCard>
                 <SectionHeader icon={Shield} title="Security & Settings" />
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between p-3 bg-white/5 rounded-xl">
-                    <div className="flex items-center gap-3"><Shield size={18} className="text-blue-400" /><span className="text-sm font-medium">2FA Auth</span></div>
-                    <button onClick={() => setIs2FA(!is2FA)} className={`w-10 h-5 rounded-full transition-colors relative ${is2FA ? 'bg-blue-500' : 'bg-gray-700'}`}>
-                      <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${is2FA ? 'left-6' : 'left-1'}`} />
-                    </button>
-                  </div>
-                  <button className="w-full flex items-center justify-center gap-2 py-3 bg-white/5 hover:bg-white/10 rounded-xl transition-all border border-white/5 text-sm">
-                    <Lock size={16} /> Change Password
-                  </button>
+                  <button
+  onClick={handleChangePassword}
+  className="w-full flex items-center justify-center gap-2 py-3 bg-white/5 hover:bg-white/10 rounded-xl transition-all border border-white/5 text-sm"
+>
+  <Lock size={16} /> Change Password
+</button>
                 </div>
               </GlassCard>
             </div>
