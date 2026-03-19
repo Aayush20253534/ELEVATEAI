@@ -59,7 +59,7 @@ const Textarea = ({ label, required, ...props }) => (
 export default function ResumeBuilder() {
   const [stage, setStage] = useState(1);
   const chatScrollRef = useRef(null);
-
+  const [analyzing, setAnalyzing] = useState(false);
   const [contactInfo, setContactInfo] = useState({
     fullName: '', email: '', phone: '', location: '', linkedin: '', github: '', portfolio: ''
   });
@@ -136,49 +136,49 @@ const isResumeValid =
     setter(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleCompile = async () => {
+const handleCompile = async () => {
+  const token = localStorage.getItem("token");
 
-    const token = localStorage.getItem("token")
-
-    const resumeData = {
-      contact: contactInfo,
-      summary,
-      skills,
-      experience,
-      projects,
-      education,
-      certifications,
-      achievements,
-      languages
-    }
-
-    try {
-
-      const res = await axios.post(
-        "http://127.0.0.1:8000/resume/generate",
-        {
-          session_id: user ? user.email : "session1",
-          resume_data: resumeData
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        }
-      )
-
-      const cleanedHTML = res.data.html
-  .replace(/^```html\s*/i, "")
-  .replace(/^```/i, "")
-  .replace(/```$/, "");
-
-setResumeHTML(cleanedHTML);
-      setStage(2)
-
-    } catch (err) {
-      console.error(err)
-    }
+  const resumeData = {
+    contact: contactInfo,
+    summary,
+    skills,
+    experience,
+    projects,
+    education,
+    certifications,
+    achievements,
+    languages
   };
+
+  setAnalyzing(true); // 🔥 START LOADING
+
+  try {
+    const res = await axios.post(
+      "http://127.0.0.1:8000/resume/generate",
+      {
+        session_id: user ? user.email : "session1",
+        resume_data: resumeData
+      },
+      {
+        headers: { Authorization: `Bearer ${token}` }
+      }
+    );
+
+    const cleanedHTML = res.data.html
+      .replace(/^```html\s*/i, "")
+      .replace(/^```/i, "")
+      .replace(/```$/, "");
+
+    setResumeHTML(cleanedHTML);
+    setStage(2);
+
+  } catch (err) {
+    console.error(err);
+  }
+
+  setAnalyzing(false); 
+};
 
   const handleDownload = () => {
     const element = document.createElement("a");
@@ -260,7 +260,26 @@ setResumeHTML(cleanedHTML);
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.02),transparent_40%)] pointer-events-none" />
         <div className="flex-1 overflow-y-auto p-6 md:p-8 w-full relative z-10 custom-scrollbar">
           <AnimatePresence mode="wait">
-            {stage === 1 ? (
+            {analyzing ? (
+  <div className="h-[70vh] flex flex-col items-center justify-center">
+    <div className="relative w-20 h-20 mb-8">
+      <motion.div
+        animate={{ rotate: 360 }}
+        transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
+        className="absolute inset-0 border-4 border-cyan-500/10 border-t-cyan-500 rounded-full"
+      />
+      <Cpu className="absolute inset-0 m-auto text-cyan-400 animate-pulse" size={28} />
+    </div>
+
+    <h2 className="text-xl font-bold text-white tracking-wide">
+      Building Your Resume...
+    </h2>
+    <p className="text-slate-500 mt-2">
+      Optimizing structure & content with AI
+    </p>
+  </div>
+
+) : stage === 1 ? (
               <motion.div
                 key="stage1"
                 initial={{ opacity: 0, y: 10 }}
@@ -315,7 +334,11 @@ setResumeHTML(cleanedHTML);
                     <Textarea required label="Professional Summary" value={summary} onChange={e => setSummary(e.target.value)} placeholder="A passionate software engineer with experience in..." />
                   </Card>
 
-                  <Card title="Skills" icon={Cpu}>
+                  <Card title={
+  <span>
+    Skills <span className="text-red-400">*</span>
+  </span>
+} icon={Cpu}>
                     <div className="flex flex-col gap-3">
                       <div className="flex gap-2">
                         <div className="flex-1">
@@ -406,15 +429,25 @@ setResumeHTML(cleanedHTML);
                   </div>
                 </Card>
 
-                <Card title="Education" icon={GraduationCap}>
+                <Card 
+  title={
+    <span>
+      Education <span className="text-red-400">*</span>
+    </span>
+  } 
+  icon={GraduationCap}
+>
                   <div className="space-y-4">
                     {education.map((edu, index) => (
                       <div key={index} className="p-4 border border-white/10 rounded-xl space-y-3 bg-white/[0.02] relative group">
                         <button onClick={() => removeArrayItem(setEducation, index)} className="absolute top-3 right-3 text-white/40 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"><X size={16} /></button>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
-                          <div className="lg:col-span-2"><Input label="Degree" value={edu.degree} onChange={e => updateArrayItem(setEducation, index, 'degree', e.target.value)} /></div>
-                          <div className="lg:col-span-3"><Input label="Institution" value={edu.institution} onChange={e => updateArrayItem(setEducation, index, 'institution', e.target.value)} /></div>
-                          <Input
+                          <Input required label="Degree" value={edu.degree} onChange={e => updateArrayItem(setEducation, index, 'degree', e.target.value)} />
+
+<Input required label="Institution" value={edu.institution} onChange={e => updateArrayItem(setEducation, index, 'institution', e.target.value)} />
+
+<Input
+  required
   label="Start Year"
   type="date"
   value={edu.startYear}
@@ -424,6 +457,7 @@ setResumeHTML(cleanedHTML);
 />
 
 <Input
+  required
   label="End Year"
   type="date"
   min={edu.startYear}
@@ -432,7 +466,8 @@ setResumeHTML(cleanedHTML);
     updateArrayItem(setEducation, index, 'endYear', e.target.value)
   }
 />
-                          <Input
+ <Input
+  required
   label="CPI"
   type="number"
   min="0"

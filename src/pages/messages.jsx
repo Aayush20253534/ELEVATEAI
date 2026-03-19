@@ -4,10 +4,11 @@ import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Send, Search, MoreVertical, Paperclip, Smile, 
-  ChevronLeft, CheckCheck, Check, SearchIcon, Filter, Plus
+  ChevronLeft, CheckCheck, SearchIcon, Filter, Plus
 } from 'lucide-react';
 import Sidebar from '../components/sidebar';
 import { Users } from "lucide-react";
+import { Check, X } from "lucide-react";
 
 const API = import.meta.env.VITE_API_URL;
 const EMOJIS = [
@@ -114,48 +115,113 @@ const FriendsPopup = ({ onClose }) => {
     });
     setFriends(res.data);
   };
-  const respond = async (id, action) => {
+const respond = async (id, action) => {
+  setRequests(prev => prev.filter(r => r.id !== id));
+
+  try {
     await axios.post(`${API}/friends/respond/${id}?action=${action}`, {}, {
       headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
     });
-    fetchRequests();
+
     fetchFriends();
-  };
+  } catch (err) {
+    console.error(err);
+    fetchRequests();
+  }
+};
 
   return (
-    <div
+<motion.div
   ref={popupRef}
-  className="absolute top-16 right-4 w-[320px] bg-[#111827] border border-slate-700 rounded-xl shadow-lg z-50 p-4"
+  initial={{ opacity: 0, scale: 0.95, y: -10 }}
+  animate={{ opacity: 1, scale: 1, y: 0 }}
+  className="absolute top-16 right-4 w-[340px] 
+  bg-[#0f172a]/95 backdrop-blur-xl 
+  border border-slate-700/60 
+  rounded-2xl shadow-2xl z-50 p-4"
 >
-      {/* Pending Requests */}
-      <h3 className="text-sm font-bold text-white mb-2">Requests</h3>
+      <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">
+  Requests
+</h3>
 
 {requests.length === 0 && (
   <p className="text-xs text-gray-500">No pending requests</p>
 )}
 
 {requests.map(r => (
-        <div key={r.id} className="flex justify-between items-center mb-2">
-          <span>{r.name}</span>
-          <div className="flex gap-2">
-            <button onClick={() => respond(r.id, "accept")} className="text-green-400">✔</button>
-            <button onClick={() => respond(r.id, "reject")} className="text-red-400">✕</button>
-          </div>
-        </div>
-      ))}
+  <div key={r.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-800/50 transition">
+    <div className="flex items-center gap-2">
+      <div className="w-8 h-8 rounded-full overflow-hidden bg-slate-700 flex items-center justify-center">
+  {r.profile_image ? (
+    <img
+      src={`${API}${r.profile_image}`}
+      className="w-full h-full object-cover"
+      onError={(e) => {
+        e.target.style.display = "none";
+      }}
+    />
+  ) : (
+    <span className="text-xs font-bold text-white">
+      {r.name?.charAt(0)}
+    </span>
+  )}
+</div>
+      <span className="text-sm text-white">{r.name}</span>
+    </div>
 
-      <h3 className="text-sm font-bold text-white mt-4 mb-2">Friends</h3>
+    <div className="flex gap-1">
+     <div className="flex gap-2">
+  <button
+    onClick={() => respond(r.id, "accept")}
+    className="p-2 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 
+    border border-emerald-500/20 hover:border-emerald-400/40 
+    text-emerald-400 transition-all backdrop-blur-sm"
+  >
+    <Check size={16} strokeWidth={2.5} />
+  </button>
+
+  <button
+    onClick={() => respond(r.id, "reject")}
+    className="p-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 
+    border border-red-500/20 hover:border-red-400/40 
+    text-red-400 transition-all backdrop-blur-sm"
+  >
+    <X size={16} strokeWidth={2.5} />
+  </button>
+</div>
+    </div>
+  </div>
+))}
+      <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mt-4 mb-2">
+  Friends
+</h3>
 
 {friends.length === 0 && (
   <p className="text-xs text-gray-500">No friends yet</p>
 )}
 
 {friends.map(f => (
-        <div key={f.id} className="text-sm text-gray-300">
-          {f.name}
-        </div>
-      ))}
-    </div>
+  <div key={f.id} className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-800/50 transition">
+    <div className="w-8 h-8 rounded-full overflow-hidden bg-slate-700 flex items-center justify-center">
+  {f.profile_image ? (
+    <img
+      src={`${API}${f.profile_image}`}
+      className="w-full h-full object-cover"
+      onError={(e) => {
+        e.target.style.display = "none";
+      }}
+    />
+  ) : (
+    <span className="text-xs text-white font-bold">
+      {f.name?.charAt(0)}
+    </span>
+  )}
+</div>
+
+    <span className="text-sm text-slate-300">{f.name}</span>
+  </div>
+))}
+    </motion.div>
   );
 };
 const MessageBubble = ({ message, isMe, onDelete, searchQuery, theme, navigate }) => {
@@ -360,30 +426,37 @@ const ContactItem = ({
   </h3>
 
   <div className="relative">
-    <button
-     onClick={(e) => {
-  e.stopPropagation();
-  setMenuOpen();
-}}
-      className="p-1 hover:bg-slate-700 rounded"
-    >
-      <MoreVertical size={14} />
-    </button>
+  <button
+    onClick={(e) => {
+      e.stopPropagation();
+      setMenuOpen();
+    }}
+    className="p-1 hover:bg-slate-700 rounded"
+  >
+    <MoreVertical size={14} />
+  </button>
 
+  <AnimatePresence>
     {menuOpen && (
-      <div className="absolute right-0 mt-1 w-32 bg-[#111827] border border-slate-700 rounded-lg shadow-lg z-50">
+      <motion.div
+        initial={{ opacity: 0, y: -5, scale: 0.95 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: -5, scale: 0.95 }}
+        className="absolute right-0 mt-2 w-32 bg-[#111827] border border-slate-700 rounded-lg shadow-xl z-50 overflow-hidden"
+      >
         <button
           onClick={(e) => {
             e.stopPropagation();
             onDeleteConversation(chat.user_id);
           }}
-          className="w-full text-left px-3 py-2 text-xs hover:bg-red-500/10 text-red-400"
+          className="w-full text-left px-3 py-2 text-xs hover:bg-red-500/10 text-red-400 transition"
         >
           Delete Chat
         </button>
-      </div>
+      </motion.div>
     )}
-  </div>
+  </AnimatePresence>
+</div>
 </div>
       <p className="text-xs text-slate-500 truncate mt-0.5">
   {chat.last_sender_id === currentUserId ? "You: " : ""}
@@ -405,10 +478,22 @@ useEffect(() => {
   localStorage.setItem("chat-theme", theme);
 }, [theme]);
 
+useEffect(() => {
+  const handleClickOutside = () => {
+    setOpenMenuId(null);
+    setChatMenuOpen(false);
+  };
+
+  window.addEventListener("click", handleClickOutside);
+  return () => window.removeEventListener("click", handleClickOutside);
+}, []);
+
 const currentTheme = THEMES[theme] || THEMES.dark;
   const { receiver_id } = useParams();
+  const [themeMenuOpen, setThemeMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const navigate = useNavigate();
+  const [chatMenuOpen, setChatMenuOpen] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [showEmoji, setShowEmoji] = useState(false);
   const [inbox, setInbox] = useState([]);
@@ -511,15 +596,18 @@ useEffect(() => {
   if (!receiver_id) return;
 
   
-  const fetchUser = async () => {
-    try {
-      const res = await axios.get(`${API}/user/${receiver_id}`);
-      setReceiver(res.data);
-    } catch (err) {
-      console.error("User fetch error", err);
-    }
-  };
-
+const fetchUser = async () => {
+  try {
+    const res = await axios.get(`${API}/user/${receiver_id}`, {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    });
+    setReceiver(res.data);
+  } catch (err) {
+    console.error("User fetch error", err);
+  }
+};
   fetchUser();
 }, [receiver_id]);
 
@@ -801,19 +889,71 @@ const filteredMessages = messages.filter((msg) => {
     </button>
   )}
 
-      <select
-  value={theme}
-  onChange={(e) => setTheme(e.target.value)}
-  className="bg-[#111827] text-white text-xs px-2 py-1 rounded border border-slate-600"
->
-  {Object.entries(THEMES).map(([key, t]) => (
-    <option key={key} value={key}>
-      {t.name}
-    </option>
-  ))}
-</select>
+      <div className="relative">
+  <button
+    onClick={() => setThemeMenuOpen(prev => !prev)}
+    className="flex items-center gap-2 px-3 py-1.5 rounded-lg 
+    bg-[#111827] border border-slate-700 hover:border-indigo-500 
+    text-xs text-white transition-all shadow-sm hover:shadow-indigo-500/20"
+  >
+    🎨 <span>{THEMES[theme]?.name}</span>
+  </button>
 
-  <MoreVertical size={18} className="cursor-pointer text-slate-400 hover:text-white" />
+  {themeMenuOpen && (
+    <div className="absolute right-0 mt-2 w-40 bg-[#0f172a] border border-slate-700 rounded-xl shadow-xl z-50 p-1 backdrop-blur-md">
+      {Object.entries(THEMES).map(([key, t]) => (
+        <button
+          key={key}
+          onClick={() => {
+            setTheme(key);
+            setThemeMenuOpen(false);
+          }}
+          className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs transition
+            hover:bg-slate-800 ${
+              theme === key ? "bg-slate-800 text-indigo-400" : "text-slate-300"
+            }`}
+        >
+          <span>{t.name}</span>
+          <span className="w-3 h-3 rounded-full bg-indigo-500"></span>
+        </button>
+      ))}
+    </div>
+  )}
+</div>
+
+  <div className="relative">
+  <button
+    onClick={(e) => {
+      e.stopPropagation();
+      setChatMenuOpen(prev => !prev);
+    }}
+    className="cursor-pointer text-slate-400 hover:text-white"
+  >
+    <MoreVertical size={18} />
+  </button>
+
+  <AnimatePresence>
+    {chatMenuOpen && (
+      <motion.div
+        initial={{ opacity: 0, y: -5, scale: 0.95 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: -5, scale: 0.95 }}
+        className="absolute right-0 mt-2 w-40 bg-[#111827] border border-slate-700 rounded-lg shadow-xl z-50 overflow-hidden"
+      >
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            deleteConversation(receiver_id);
+            setChatMenuOpen(false);
+          }}
+          className="w-full text-left px-4 py-2 text-sm hover:bg-red-500/10 text-red-400"
+        >
+          Delete Chat
+        </button>
+      </motion.div>
+    )}
+  </AnimatePresence>
+</div>
 </div>
               </header>
 

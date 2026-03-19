@@ -1743,6 +1743,78 @@ async def create_post(
     conn.close()
 
     return {"message": "Post created"}
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
+@app.post("/change-password")
+def change_password(
+    data: ChangePasswordRequest,
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    email = verify_token(credentials.credentials)
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT password FROM users WHERE email=?", (email,))
+    user = cursor.fetchone()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if not verify_password(data.current_password, user["password"]):
+        raise HTTPException(status_code=400, detail="Incorrect current password")
+
+    new_hashed = hash_password(data.new_password)
+
+    cursor.execute(
+        "UPDATE users SET password=? WHERE email=?",
+        (new_hashed, email)
+    )
+
+    conn.commit()
+    conn.close()
+
+    return {"message": "Password updated successfully"}
+
+@app.delete("/friends/remove/{user_id}")
+def remove_friend(
+    user_id: int,
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    email = verify_token(credentials.credentials)
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT id FROM users WHERE email=?", (email,))
+    current = cursor.fetchone()
+
+    if not current:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    current_user_id = current["id"]
+
+    cursor.execute("""
+        DELETE FROM friend_requests
+        WHERE 
+            status='accepted' AND
+            (
+                (sender_id=? AND receiver_id=?)
+                OR
+                (sender_id=? AND receiver_id=?)
+            )
+    """, (current_user_id, user_id, user_id, current_user_id))
+
+    conn.commit()
+    conn.close()
+
+    return {"message": "Friend removed"}
+
+
 @app.get("/feed")
 def get_feed(credentials: HTTPAuthorizationCredentials = Depends(security)):
     email = verify_token(credentials.credentials)

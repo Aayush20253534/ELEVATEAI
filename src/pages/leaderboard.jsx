@@ -44,6 +44,7 @@ const UserCard = ({ user, rank, onClick, navigate, currentUser }) => {
   const isSelf = String(currentUser?.id) === String(user.id);
   const isFriend = user.isFriend;
   const [sent, setSent] = useState(user.requestSent || false);
+  const [showMenu, setShowMenu] = useState(false);
 
   return (
   <motion.div
@@ -132,15 +133,60 @@ const UserCard = ({ user, rank, onClick, navigate, currentUser }) => {
 
 <div className="flex gap-2">
   {isSelf ? (
-    <div className="w-[110px]" />  // empty space
+    <div className="w-[110px]" />
   ) : isFriend ? (
-    <div
-  onClick={(e) => e.stopPropagation()}
-  className="px-4 py-3 rounded-xl bg-green-600/20 text-green-400 border border-green-500/30 text-sm font-bold"
->
-  Friend
-</div>
-  ) : (
+<>
+  <button
+    onClick={(e) => {
+      e.stopPropagation();
+      navigate(`/chat/${user.id}`);
+    }}
+    className="p-3 rounded-xl bg-white/5 hover:bg-blue-500/20 text-gray-400 hover:text-blue-400 transition-all border border-white/10 hover:border-blue-500/40"
+  >
+    <MessageSquare size={18} />
+  </button>
+
+  <div className="relative">
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        setShowMenu(prev => !prev);
+      }}
+      className="px-4 py-3 rounded-xl bg-green-600/20 text-green-400 border border-green-500/30 text-sm font-bold hover:bg-green-600/30 transition"
+    >
+      Friend ✓
+    </button>
+
+    {showMenu && (
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="absolute right-0 mt-2 w-36 bg-[#0f172a] border border-white/10 rounded-xl shadow-lg z-50 overflow-hidden"
+      >
+        <button
+          onClick={() => {
+            axios.delete(`${API}/friends/remove/${user.id}`, {
+              headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`
+              }
+            })
+            .then(() => {
+              setShowMenu(false);
+              window.location.reload();
+            })
+            .catch(err => {
+              console.error(err);
+              alert("Failed to remove friend");
+            });
+          }}
+          className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-red-500/10 transition"
+        >
+          Remove Friend
+        </button>
+      </div>
+    )}
+  </div>
+</>
+) : (
     <>
       <button
         onClick={(e) => {
