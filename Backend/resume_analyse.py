@@ -18,6 +18,11 @@ class WeakLineFeedback(BaseModel):
     weak_line: str = Field(description="The weakest or poorly written line from the resume")
     improved_version: str = Field(description="AI suggested improved version of that line")
 
+class BestJobRole(BaseModel):
+    best_role: str = Field(description="Most suitable job role for the candidate")
+    confidence: int = Field(description="Confidence score (0-100)")
+    reasoning: str = Field(description="Why this role is suitable")
+
 class MarketReadiness(BaseModel):
     score:int = Field(description="Percentage Readiness of User")
     market_readiness:Literal['Very Low','Low','Medium','High','Very High'] = Field(description="User's Overall Job Market Readiness")

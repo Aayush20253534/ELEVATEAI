@@ -20,12 +20,12 @@ const FindJobs = () => {
   const [loading, setLoading] = useState(false);
   const [jobs, setJobs] = useState([]);
   const [selectedJob, setSelectedJob] = useState(null);
- const [searchQuery, setSearchQuery] = useState({
-  query: "",
-  location: "",
-  experience: "Intermediate",
-  sources: ["linkedin", "naukri", "web"],
-});
+  const [searchQuery, setSearchQuery] = useState({
+    query: "",
+    location: "",
+    experience: "Intermediate",
+    sources: ["linkedin", "naukri", "web"],
+  });
 
   const sources = [
     { id: "linkedin", label: "LinkedIn", color: "bg-blue-600" },
@@ -33,45 +33,43 @@ const FindJobs = () => {
     { id: "web", label: "Web Jobs", color: "bg-emerald-500" },
   ];
 
-useEffect(() => {
+  useEffect(() => {
 
-  const fromResume = location.state?.trigger === "resume";
+    const fromResume = location.state?.trigger === "resume";
 
-  if (fromResume) {
+    if (fromResume) {
 
-    const token = localStorage.getItem("token");
+      const token = localStorage.getItem("token");
 
-    axios.get(`${API}/me`, {
-      headers: { Authorization: `Bearer ${token}` }
-    })
-    .then(res => {
+      axios.get(`${API}/user/best-job`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+        .then(res => {
 
-      const role = res.data.target_role;
+          const role = res.data.best_job_role;   // 🔥 AI ROLE
 
-      if (!role) return;
+          if (!role) return;
 
-      // auto fill search box
-      setSearchQuery(prev => ({
-        ...prev,
-        query: role
-      }));
+          setSearchQuery(prev => ({
+            ...prev,
+            query: role
+          }));
 
-      // auto run search
-      autoSearch(role);
+          autoSearch(role);
 
-    })
-    .catch(err => console.error(err));
+        })
+        .catch(err => console.error(err));
 
-    // clear navigation state
-    window.history.replaceState({}, document.title);
+      // clear navigation state
+      window.history.replaceState({}, document.title);
 
-  } else {
+    } else {
 
-    fetchJobs();
+      fetchJobs();
 
-  }
+    }
 
-}, []);
+  }, []);
 
   const fetchJobs = async () => {
     setLoading(true);
@@ -85,7 +83,7 @@ useEffect(() => {
         title: job.title,
         company: job.company,
         location: job.location,
-        
+
         source: job.source || "Web",
         match_score: Math.floor(Math.random() * 40) + 60,
         description: job.description,
@@ -101,45 +99,48 @@ useEffect(() => {
     setLoading(false);
   };
 
-const autoSearch = async (jobTitle) => {
+  const autoSearch = async (jobTitle) => {
 
-  setLoading(true);
+    setLoading(true);
 
-  try {
-    const res = await fetch(`${API}/jobs/search`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        ...searchQuery,
-        query: jobTitle
-      }),
-    });
+    try {
+      const token = localStorage.getItem("token");
 
-    const data = await res.json();
+      const res = await fetch(`${API}/jobs/search`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`   // 🔥 ADD THIS
+        },
+        body: JSON.stringify({
+          ...searchQuery,
+          query: jobTitle
+        }),
+      });
 
-    const formattedJobs = (data.jobs || []).map((job, i) => ({
-      id: i,
-      title: job.title,
-      company: job.company,
-      location: job.location,
-      
-      source: job.source || "Web",
-      match_score: Math.floor(Math.random() * 40) + 60,
-      description: job.description,
-      skills: [],
-      url: job.url,
-    }));
+      const data = await res.json();
 
-    setJobs(formattedJobs);
+      const formattedJobs = (data.jobs || []).map((job, i) => ({
+        id: i,
+        title: job.title,
+        company: job.company,
+        location: job.location,
 
-  } catch (err) {
-    console.error("Auto job search failed:", err);
-  }
+        source: job.source || "Web",
+        match_score: Math.floor(Math.random() * 40) + 60,
+        description: job.description,
+        skills: [],
+        url: job.url,
+      }));
 
-  setLoading(false);
-};
+      setJobs(formattedJobs);
+
+    } catch (err) {
+      console.error("Auto job search failed:", err);
+    }
+
+    setLoading(false);
+  };
 
   const handleSearch = async (e) => {
     e.preventDefault();
@@ -152,10 +153,13 @@ const autoSearch = async (jobTitle) => {
     setLoading(true);
 
     try {
+      const token = localStorage.getItem("token");
+
       const res = await fetch(`${API}/jobs/search`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`   // 🔥 ADD THIS
         },
         body: JSON.stringify(searchQuery),
       });
@@ -166,7 +170,7 @@ const autoSearch = async (jobTitle) => {
         id: i,
         title: job.title,
         company: job.company,
-        location: job.location,    
+        location: job.location,
         source: job.source || "Web",
         match_score: Math.floor(Math.random() * 40) + 60,
         description: job.description,
@@ -436,11 +440,11 @@ const JobModal = ({ job, onClose }) => {
                   {job.company}
                 </span>
 
-                <span className="w-1 h-1 bg-slate-600 rounded-full"/>
+                <span className="w-1 h-1 bg-slate-600 rounded-full" />
 
                 <span>{job.location || "Remote"}</span>
 
-                <span className="w-1 h-1 bg-slate-600 rounded-full"/>
+                <span className="w-1 h-1 bg-slate-600 rounded-full" />
 
                 <span className="text-indigo-300">
                   {job.source}
