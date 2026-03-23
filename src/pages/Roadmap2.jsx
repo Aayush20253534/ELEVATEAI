@@ -311,50 +311,57 @@ const SkillRoadmap2 = () => {
   const t = T[language] || T.en;
   const langDir = LANGUAGES.find(l => l.code === language)?.dir || "ltr";
 
- const toggleMic = async () => {
-  if (isListening) {
-    mediaRecorderRef.current.stop();
-    setIsListening(false);
-  } else {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  const toggleMic = async () => {
+    if (isListening) {
+      mediaRecorderRef.current.stop();
+      setIsListening(false);
+    } else {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
-      mediaRecorderRef.current = new MediaRecorder(stream);
-      audioChunksRef.current = [];
+        mediaRecorderRef.current = new MediaRecorder(stream, {
+          mimeType: "audio/webm"
+        });
+        audioChunksRef.current = [];
 
-      mediaRecorderRef.current.ondataavailable = (e) => {
-        audioChunksRef.current.push(e.data);
-      };
+        mediaRecorderRef.current.ondataavailable = (e) => {
+          audioChunksRef.current.push(e.data);
+        };
 
-      mediaRecorderRef.current.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: "audio/wav" });
+        mediaRecorderRef.current.onstop = async () => {
+          const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
 
-        const formData = new FormData();
-        formData.append("file", audioBlob);
-        formData.append("language", language);
+          const selectedLang = LANGUAGES.find(l => l.code === language);
 
-        try {
-          const res = await axios.post(`${API}/audio/process`, formData, {
-            headers: { "Content-Type": "multipart/form-data" },
-          });
+          const formData = new FormData();
+          formData.append("file", audioBlob);
+          formData.append("language", selectedLang?.code || "en"); // 🔥 backend expects "hi", "en"
 
-          const detectedRole = res.data.english_translation;
-          setShowRoadmap(false);
-          setRoadmapData([]);
-          setRole(detectedRole); 
-        } catch (err) {
-          console.error("Audio processing error:", err);
-        }
-      };
+          try {
+            const res = await axios.post(`${API}/audio/process`, formData, {
+              headers: { "Content-Type": "multipart/form-data" },
+            });
 
-      mediaRecorderRef.current.start();
-      setIsListening(true);
+            const detectedRole = res.data.transcription; 
+            const aiRole = res.data.processed_text;
 
-    } catch (err) {
-      console.error("Mic error:", err);
+            setShowRoadmap(false);
+            setRoadmapData([]);
+
+            setRole(aiRole); 
+          } catch (err) {
+            console.error("Audio processing error:", err);
+          }
+        };
+
+        mediaRecorderRef.current.start();
+        setIsListening(true);
+
+      } catch (err) {
+        console.error("Mic error:", err);
+      }
     }
-  }
-};
+  };
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -366,13 +373,13 @@ const SkillRoadmap2 = () => {
 
   useEffect(() => {
     const token = localStorage.getItem("token");
-    if (!token) {return;}
+    if (!token) { return; }
     axios.get(`${API}/me`, { headers: { Authorization: `Bearer ${token}` } })
       .then(res => { setUser(res.data); setStreak(res.data.learning_streak || 0); })
       .catch(err => console.error(err));
     axios.get(`${API}/roadmap/user`, { headers: { Authorization: `Bearer ${token}` } })
       .then(res => { if (res.data?.roadmap) { setRoadmapData(res.data.roadmap); setShowRoadmap(true); } })
-      .catch(() => {});
+      .catch(() => { });
   }, [navigate]);
 
   useEffect(() => {
@@ -428,27 +435,27 @@ const SkillRoadmap2 = () => {
     return `${Math.ceil(totalHours / 10)} Weeks`;
   };
 
- const formatRoadmapText = () => {
-  let content = `${role.toUpperCase()} ROADMAP\n\n`;
+  const formatRoadmapText = () => {
+    let content = `${role.toUpperCase()} ROADMAP\n\n`;
 
-  roadmapData.forEach((stage, i) => {
-    content += `STAGE ${i + 1}: ${stage.title}\n`;
-    content += `Duration: ${stage.duration}\n\n`;
+    roadmapData.forEach((stage, i) => {
+      content += `STAGE ${i + 1}: ${stage.title}\n`;
+      content += `Duration: ${stage.duration}\n\n`;
 
-    stage.skills.forEach((skill, idx) => {
-      content += `${idx + 1}. ${skill.name}\n`;
-      content += `   Time: ${skill.time}\n`;
-      content += `   Status: ${skill.status}\n`;
-      content += `   Difficulty: ${skill.difficulty}\n`;
-      if (skill.url) content += `   Link: ${skill.url}\n`;
-      content += `\n`;
+      stage.skills.forEach((skill, idx) => {
+        content += `${idx + 1}. ${skill.name}\n`;
+        content += `   Time: ${skill.time}\n`;
+        content += `   Status: ${skill.status}\n`;
+        content += `   Difficulty: ${skill.difficulty}\n`;
+        if (skill.url) content += `   Link: ${skill.url}\n`;
+        content += `\n`;
+      });
+
+      content += `--------------------------------------\n\n`;
     });
 
-    content += `--------------------------------------\n\n`;
-  });
-
-  return content;
-};
+    return content;
+  };
   const handleGenerate = async () => {
     if (!role.trim()) { alert("Please enter a target role"); return; }
     setLoading(true);
@@ -470,7 +477,7 @@ const SkillRoadmap2 = () => {
           progress: 0,
           skills: data.basic.map(c => ({
             name: c.title, difficulty: c.toughness, time: c.learning_time, status: "Not Started",
-            url: c.learning_link || `https://www.youtube.com/results?search_query=${encodeURIComponent(c.title)}`
+            url: c.learning_link || `https://www.youtube.com/results?search_query=${encodeURIComponent(c.original_title || c.title)}`
           }))
         },
         {
@@ -503,141 +510,141 @@ const SkillRoadmap2 = () => {
     }
     setLoading(false);
   };
-useEffect(() => {
-  const savedRoadmap = localStorage.getItem("roadmap");
+  useEffect(() => {
+    const savedRoadmap = localStorage.getItem("roadmap");
 
-  if (savedRoadmap) {
-    const parsed = JSON.parse(savedRoadmap);
-    setRoadmapData(parsed);
-    setShowRoadmap(true);
-  }
-}, []);
-const downloadRoadmap = () => {
-  const pdf = new jsPDF();
-  let y = 20;
-
-  // 🖤 BACKGROUND + HEADER
-  const drawBackground = () => {
-    pdf.setFillColor(10, 10, 15);
-    pdf.rect(0, 0, 210, 297, "F");
-
-    // HEADER
-    pdf.setFillColor(30, 41, 59);
-    pdf.rect(0, 0, 210, 25, "F");
-
-    pdf.setTextColor(96, 165, 250);
-    pdf.setFont("Helvetica", "bold");
-    pdf.setFontSize(18);
-    pdf.text(`${(role || "Career").toUpperCase()} ROADMAP`, 10, 15);
-  };
-
-  drawBackground();
-  y = 35;
-
-  roadmapData.forEach((stage, i) => {
-    // 🧠 PAGE BREAK
-    if (y > 260) {
-      pdf.addPage();
-      drawBackground();
-      y = 30;
+    if (savedRoadmap) {
+      const parsed = JSON.parse(savedRoadmap);
+      setRoadmapData(parsed);
+      setShowRoadmap(true);
     }
+  }, []);
+  const downloadRoadmap = () => {
+    const pdf = new jsPDF();
+    let y = 20;
 
-    // 🧱 STAGE CARD
-    pdf.setFillColor(20, 20, 30);
-    pdf.roundedRect(10, y, 190, 20, 4, 4, "F");
+    // 🖤 BACKGROUND + HEADER
+    const drawBackground = () => {
+      pdf.setFillColor(10, 10, 15);
+      pdf.rect(0, 0, 210, 297, "F");
 
-    const cleanTitle =
-      stage.title?.split(":")[1]?.trim() || stage.title;
+      // HEADER
+      pdf.setFillColor(30, 41, 59);
+      pdf.rect(0, 0, 210, 25, "F");
 
-    pdf.setTextColor(96, 165, 250);
-    pdf.setFontSize(10);
-    pdf.text(`STAGE ${i + 1}`, 14, y + 7);
+      pdf.setTextColor(96, 165, 250);
+      pdf.setFont("Helvetica", "bold");
+      pdf.setFontSize(18);
+      pdf.text(`${(role || "Career").toUpperCase()} ROADMAP`, 10, 15);
+    };
 
-    pdf.setTextColor(255);
-    pdf.setFontSize(12);
-    pdf.text(cleanTitle, 14, y + 14);
+    drawBackground();
+    y = 35;
 
-    y += 24;
-
-    // ⏱ DURATION
-    pdf.setTextColor(148, 163, 184);
-    pdf.setFontSize(9);
-    pdf.text(`Duration: ${stage.duration}`, 14, y);
-
-    y += 10;
-
-    stage.skills.forEach((skill, idx) => {
+    roadmapData.forEach((stage, i) => {
+      // 🧠 PAGE BREAK
       if (y > 260) {
         pdf.addPage();
         drawBackground();
         y = 30;
       }
 
-      // 🧩 SKILL CARD
-      pdf.setFillColor(30, 30, 45);
-      pdf.roundedRect(12, y - 4, 186, 34, 3, 3, "F");
+      // 🧱 STAGE CARD
+      pdf.setFillColor(20, 20, 30);
+      pdf.roundedRect(10, y, 190, 20, 4, 4, "F");
 
-      // 🔢 TITLE
-      pdf.setTextColor(255);
-      pdf.setFont("Helvetica", "bold");
+      const cleanTitle =
+        stage.title?.split(":")[1]?.trim() || stage.title;
+
+      pdf.setTextColor(96, 165, 250);
       pdf.setFontSize(10);
-      pdf.text(`${idx + 1}. ${skill.name}`, 16, y + 2);
+      pdf.text(`STAGE ${i + 1}`, 14, y + 7);
+
+      pdf.setTextColor(255);
+      pdf.setFontSize(12);
+      pdf.text(cleanTitle, 14, y + 14);
+
+      y += 24;
+
+      // ⏱ DURATION
+      pdf.setTextColor(148, 163, 184);
+      pdf.setFontSize(9);
+      pdf.text(`Duration: ${stage.duration}`, 14, y);
 
       y += 10;
 
-      // 🎨 DIFFICULTY BADGE
-      let color = [34, 197, 94]; // easy
-      if (skill.difficulty?.toLowerCase() === "medium")
-        color = [234, 179, 8];
-      if (skill.difficulty?.toLowerCase() === "hard")
-        color = [239, 68, 68];
+      stage.skills.forEach((skill, idx) => {
+        if (y > 260) {
+          pdf.addPage();
+          drawBackground();
+          y = 30;
+        }
 
-      pdf.setFillColor(...color);
-      pdf.roundedRect(150, y - 6, 35, 7, 2, 2, "F");
+        // 🧩 SKILL CARD
+        pdf.setFillColor(30, 30, 45);
+        pdf.roundedRect(12, y - 4, 186, 34, 3, 3, "F");
 
-      pdf.setTextColor(0);
-      pdf.setFontSize(8);
-      pdf.text(skill.difficulty || "Easy", 152, y - 1);
+        // 🔢 TITLE
+        pdf.setTextColor(255);
+        pdf.setFont("Helvetica", "bold");
+        pdf.setFontSize(10);
+        pdf.text(`${idx + 1}. ${skill.name}`, 16, y + 2);
 
-      // 🕒 TIME BADGE (NO EMOJI)
-      pdf.setFillColor(40, 40, 60);
-      pdf.roundedRect(16, y - 4, 45, 8, 2, 2, "F");
+        y += 10;
 
-      pdf.setTextColor(148, 163, 184);
-      pdf.setFontSize(8);
-      pdf.text(`Time: ${skill.time}`, 18, y + 1);
+        // 🎨 DIFFICULTY BADGE
+        let color = [34, 197, 94]; // easy
+        if (skill.difficulty?.toLowerCase() === "medium")
+          color = [234, 179, 8];
+        if (skill.difficulty?.toLowerCase() === "hard")
+          color = [239, 68, 68];
 
+        pdf.setFillColor(...color);
+        pdf.roundedRect(150, y - 6, 35, 7, 2, 2, "F");
+
+        pdf.setTextColor(0);
+        pdf.setFontSize(8);
+        pdf.text(skill.difficulty || "Easy", 152, y - 1);
+
+        // 🕒 TIME BADGE (NO EMOJI)
+        pdf.setFillColor(40, 40, 60);
+        pdf.roundedRect(16, y - 4, 45, 8, 2, 2, "F");
+
+        pdf.setTextColor(148, 163, 184);
+        pdf.setFontSize(8);
+        pdf.text(`Time: ${skill.time}`, 18, y + 1);
+
+
+        y += 12;
+
+        // 🔗 LINK CARD
+        if (skill.url) {
+          pdf.setFillColor(20, 20, 30);
+          pdf.roundedRect(16, y - 2, 170, 12, 2, 2, "F");
+
+          pdf.setTextColor(96, 165, 250);
+          pdf.setFontSize(7);
+
+          const link = pdf.splitTextToSize(skill.url, 160);
+          pdf.text(link, 18, y + 4);
+
+          y += link.length * 4 + 6;
+        } else {
+          y += 4;
+        }
+
+        y += 6; // spacing between skills
+      });
+
+      // divider
+      pdf.setDrawColor(50);
+      pdf.line(10, y, 200, y);
 
       y += 12;
-
-      // 🔗 LINK CARD
-      if (skill.url) {
-        pdf.setFillColor(20, 20, 30);
-        pdf.roundedRect(16, y - 2, 170, 12, 2, 2, "F");
-
-        pdf.setTextColor(96, 165, 250);
-        pdf.setFontSize(7);
-
-        const link = pdf.splitTextToSize(skill.url, 160);
-        pdf.text(link, 18, y + 4);
-
-        y += link.length * 4 + 6;
-      } else {
-        y += 4;
-      }
-
-      y += 6; // spacing between skills
     });
 
-    // divider
-    pdf.setDrawColor(50);
-    pdf.line(10, y, 200, y);
-
-    y += 12;
-  });
-
-  pdf.save(`${(role || "Career")}_Dark_Roadmap.pdf`);
-};
+    pdf.save(`${(role || "Career")}_Dark_Roadmap.pdf`);
+  };
   const normalizedRole = role.trim();
   const requiredSkills = ROLE_SKILLS[normalizedRole] || [];
   const skillGaps = user?.skills ? requiredSkills.filter(skill => !user.skills.includes(skill)) : [];
@@ -913,7 +920,7 @@ const downloadRoadmap = () => {
         }
       `}</style>
 
-      
+
 
       <main className="sr-root flex-1 flex flex-col overflow-y-auto">
         <div className="p-8 max-w-7xl mx-auto w-full">
@@ -937,8 +944,8 @@ const downloadRoadmap = () => {
                 >
                   {LANGUAGES.map(l => (
                     <option key={l.code} value={l.code}>
-  {"\u00A0\u00A0"}{l.label}
-</option>
+                      {"\u00A0\u00A0"}{l.label}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -1099,20 +1106,20 @@ const StageCard = ({ stage, index, onStatusChange, highlightSkill, openStageId, 
             <div className="text-right hidden sm:block">
               <div className="text-[10px] uppercase font-bold text-slate-500 mb-1">{t.progress}</div>
               {stage.progress > 0 && (
-  <div className="w-28 bg-slate-800 h-1.5 rounded-full overflow-hidden">
-    <motion.div
-      initial={{ width: 0 }}
-      animate={{ width: `${stage.progress}%` }}
-      style={{
-        height: "100%",
-        background: stage.progress === 100
-          ? "#10b981"
-          : "linear-gradient(90deg,#3b82f6,#6366f1)",
-        borderRadius: "999px",
-      }}
-    />
-  </div>
-)}
+                <div className="w-28 bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${stage.progress}%` }}
+                    style={{
+                      height: "100%",
+                      background: stage.progress === 100
+                        ? "#10b981"
+                        : "linear-gradient(90deg,#3b82f6,#6366f1)",
+                      borderRadius: "999px",
+                    }}
+                  />
+                </div>
+              )}
             </div>
             <ChevronDown
               className="text-slate-500 transition-transform"
@@ -1224,23 +1231,23 @@ const SkillCard = ({ skill, onStatusUpdate, highlight, t }) => {
           <Clock size={9} /> {skill.time}
         </span>
         {skill.url && (
- <a
-  href={skill.url}
-  target="_blank"
-  rel="noopener noreferrer"
-  style={{
-    display: "flex",
-    alignItems: "center",
-    gap: "4px",
-    color: "#60a5fa",
-    fontSize: "10px",
-    fontWeight: 700,
-    marginTop: "4px"
-  }}
->
-  {t.docs} <ExternalLink size={10} />
-</a>
-)}
+          <a
+            href={skill.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "4px",
+              color: "#60a5fa",
+              fontSize: "10px",
+              fontWeight: 700,
+              marginTop: "4px"
+            }}
+          >
+            {t.docs} <ExternalLink size={10} />
+          </a>
+        )}
       </div>
     </motion.div>
   );

@@ -22,6 +22,7 @@ from transformers import pipeline
 import sqlite3
 import uuid
 import tempfile
+import torch
 import os
 import json
 import traceback
@@ -40,7 +41,18 @@ from agentic_workflow.resume_builder_agent.main import generate_resume
 
 # ---------- #
 
-asr_pipeline = pipeline("automatic-speech-recognition", model="openai/whisper-base")
+asr_pipeline = None
+
+def get_asr_pipeline():
+    global asr_pipeline
+    if asr_pipeline is None:
+        print("🚀 Loading Whisper model...")
+        asr_pipeline = pipeline(
+            "automatic-speech-recognition",
+            model="openai/whisper-small",
+            device=0 if torch.cuda.is_available() else -1
+        )
+    return asr_pipeline
 
 
 # -------- CREATE DIRECTORIES FIRST -------- #
@@ -149,7 +161,7 @@ class RoadmapRequest(BaseModel):
     experience_level: str
     learning_style: str
     limit: int = 5
-
+    language: str = "en"   # 🔥 ADD THIS
 
 class ProfileUpdate(BaseModel):
     name: str
@@ -276,6 +288,27 @@ You will be provided with the user's resume content. Analyze it and produce the 
     print(f"DEBUG AI RESPONSE: {result}")
     return result.model_dump()
 
+
+def translate_text(text, target_lang):
+    if target_lang == "en":
+        return text
+
+    message = HumanMessage(
+        content=f"""
+Translate the following text into {target_lang}.
+
+Text:
+{text}
+
+Rules:
+- Keep technical meaning accurate
+- Do not translate URLs
+- Keep concise
+"""
+    )
+
+    response = llm.invoke([message])
+    return response.content
 
 # ---------------- CORS ---------------- #
 
@@ -492,6 +525,7 @@ class JobSearchRequest(BaseModel):
 
 class ChatRequest(BaseModel):
     message: str
+    language: str = "en" 
 
 
 class SaveRoadmap(BaseModel):
@@ -537,10 +571,20 @@ def verify_token(token: str):
         raise HTTPException(status_code=401, detail="Invalid token")
 
 
-def transcribe_audio(file_path):
-    result = asr_pipeline(file_path)
-    return result["text"]
+def transcribe_audio(file_path, language=None):
+    pipe = get_asr_pipeline()
 
+    generate_kwargs = {
+        "task": "transcribe",
+        "max_new_tokens": 200
+    }
+
+    if language:
+        generate_kwargs["language"] = language   # 🔥 ADD THIS
+
+    result = pipe(file_path, generate_kwargs=generate_kwargs)
+
+    return result["text"]
 
 def translate_to_english(text):
     message = HumanMessage(
@@ -559,41 +603,44 @@ Rules:
     response = llm.invoke([message])
     return response.content
 
+def process_multilingual_input(text, language):
+    if language == "en":
+        return text
+    
+    return translate_to_english(text)
+
+
+def process_multilingual_output(text, language):
+    if language == "en":
+        return text
+    
+    return translate_text(text, language)
+import asyncio
 
 @app.post("/audio/process")
 async def process_audio(file: UploadFile = File(...), language: str = Form(...)):
     try:
-        print("📥 Audio received from frontend")
+        print("📥 Audio received")
 
-        # 📁 Save file
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
             content = await file.read()
             tmp.write(content)
             path = tmp.name
 
-        print("💾 Audio saved:", path)
+        print("🧠 Transcribing...")
 
-        # 🎤 STEP 1: Transcribe
-        print("🧠 Transcribing audio...")
-        transcription = transcribe_audio(path)
-        print("📝 Transcription:", transcription)
+        # 🔥 FIX HERE
+        raw_text = await asyncio.to_thread(transcribe_audio, path, language)
+        processed_text = process_multilingual_input(raw_text, language)
 
-        # 🌍 STEP 2: Translate
-        print("🌍 Translating...")
-        if language.lower() != "en":
-            translation = translate_to_english(transcription)
-        else:
-            translation = transcription
-
-        print("✅ Final English:", translation)
+        print("✅ Done")
 
         os.remove(path)
-        print("🗑️ Temp file deleted")
 
         return {
             "original_language": language,
-            "transcription": transcription,
-            "english_translation": translation,
+            "transcription": raw_text,
+            "processed_text": processed_text 
         }
 
     except Exception as e:
@@ -906,9 +953,41 @@ def generate_roadmap(data: RoadmapRequest):
             upper_limit=data.limit,
         )
 
+        # 🔥 TRANSLATE HERE
+        if data.language != "en":
+
+           all_texts = []
+
+           for section in ["basic", "core", "advanced"]:
+               for item in roadmap.get(section, []):
+                   if item.get("title"):
+                       all_texts.append(item["title"])
+                   if item.get("toughness"):
+                       all_texts.append(item["toughness"])
+                   if item.get("learning_time"):
+                       all_texts.append(item["learning_time"])
+
+           translated = translate_text("\n".join(all_texts), data.language).split("\n")
+
+           i = 0
+           for section in ["basic", "core", "advanced"]:
+              for item in roadmap.get(section, []):
+
+                  if item.get("title"):
+                      item["original_title"] = item["title"]
+                  if item.get("title") and i < len(translated):
+                      item["title"] = translated[i]; i += 1
+                  if item.get("toughness") and i < len(translated):
+                      item["toughness"] = translated[i]; i += 1
+                  if item.get("learning_time") and i < len(translated):
+                      item["learning_time"] = translated[i]; i += 1
+
         return roadmap
 
     except Exception as e:
+        import traceback
+        traceback.print_exc()
+        print("🔥 ROADMAP ERROR:", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -1338,7 +1417,9 @@ def chat_ai(
 
     start = time.time()
 
-    response = ask_bot(email, data.message)
+    processed_input = process_multilingual_input(data.message, data.language)
+    response = ask_bot(email, processed_input)
+    response = process_multilingual_output(response, data.language)
 
     response_time = round(time.time() - start, 2)
 
