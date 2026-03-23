@@ -22,6 +22,7 @@ from transformers import pipeline
 import sqlite3
 import uuid
 import tempfile
+import torch
 import os
 import json
 import traceback
@@ -40,7 +41,18 @@ from agentic_workflow.resume_builder_agent.main import generate_resume
 
 # ---------- #
 
-asr_pipeline = pipeline("automatic-speech-recognition", model="openai/whisper-base")
+asr_pipeline = None
+
+def get_asr_pipeline():
+    global asr_pipeline
+    if asr_pipeline is None:
+        print("🚀 Loading Whisper model...")
+        asr_pipeline = pipeline(
+            "automatic-speech-recognition",
+            model="openai/whisper-small",
+            device=0 if torch.cuda.is_available() else -1
+        )
+    return asr_pipeline
 
 
 # -------- CREATE DIRECTORIES FIRST -------- #
@@ -149,7 +161,7 @@ class RoadmapRequest(BaseModel):
     experience_level: str
     learning_style: str
     limit: int = 5
-
+    language: str = "en"   # 🔥 ADD THIS
 
 class ProfileUpdate(BaseModel):
     name: str
@@ -276,6 +288,27 @@ You will be provided with the user's resume content. Analyze it and produce the 
     print(f"DEBUG AI RESPONSE: {result}")
     return result.model_dump()
 
+
+def translate_text(text, target_lang):
+    if target_lang == "en":
+        return text
+
+    message = HumanMessage(
+        content=f"""
+Translate the following text into {target_lang}.
+
+Text:
+{text}
+
+Rules:
+- Keep technical meaning accurate
+- Do not translate URLs
+- Keep concise
+"""
+    )
+
+    response = llm.invoke([message])
+    return response.content
 
 # ---------------- CORS ---------------- #
 
@@ -537,10 +570,22 @@ def verify_token(token: str):
         raise HTTPException(status_code=401, detail="Invalid token")
 
 
-def transcribe_audio(file_path):
-    result = asr_pipeline(file_path)
-    return result["text"]
+def transcribe_audio(file_path, language=None):
+    pipe = get_asr_pipeline()
 
+    kwargs = {"task": "transcribe"}
+    if language and language != "en":
+        kwargs["language"] = language
+
+    result = pipe(
+            file_path,
+            generate_kwargs={
+                "task": "transcribe",
+                "max_new_tokens": 200   # 🔥 add this
+            }
+        )
+
+    return result["text"]
 
 def translate_to_english(text):
     message = HumanMessage(
@@ -560,40 +605,30 @@ Rules:
     return response.content
 
 
+import asyncio
+
 @app.post("/audio/process")
 async def process_audio(file: UploadFile = File(...), language: str = Form(...)):
     try:
-        print("📥 Audio received from frontend")
+        print("📥 Audio received")
 
-        # 📁 Save file
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
             content = await file.read()
             tmp.write(content)
             path = tmp.name
 
-        print("💾 Audio saved:", path)
+        print("🧠 Transcribing...")
 
-        # 🎤 STEP 1: Transcribe
-        print("🧠 Transcribing audio...")
-        transcription = transcribe_audio(path)
-        print("📝 Transcription:", transcription)
+        # 🔥 FIX HERE
+        transcription = await asyncio.to_thread(transcribe_audio, path, language)
 
-        # 🌍 STEP 2: Translate
-        print("🌍 Translating...")
-        if language.lower() != "en":
-            translation = translate_to_english(transcription)
-        else:
-            translation = transcription
-
-        print("✅ Final English:", translation)
+        print("✅ Done")
 
         os.remove(path)
-        print("🗑️ Temp file deleted")
 
         return {
             "original_language": language,
             "transcription": transcription,
-            "english_translation": translation,
         }
 
     except Exception as e:
@@ -906,9 +941,32 @@ def generate_roadmap(data: RoadmapRequest):
             upper_limit=data.limit,
         )
 
+        # 🔥 TRANSLATE HERE
+        if data.language != "en":
+
+            all_titles = []
+
+            for section in ["basic", "core", "advanced"]:
+                for item in roadmap.get(section, []):
+                    if item.get("title"):
+                        all_titles.append(item["title"])
+
+            # 🔥 single API call
+            translated = translate_text("\n".join(all_titles), data.language).split("\n")
+
+            i = 0
+            for section in ["basic", "core", "advanced"]:
+                for item in roadmap.get(section, []):
+                    if item.get("title") and i < len(translated):
+                        item["title"] = translated[i]
+                        i += 1
+
         return roadmap
 
     except Exception as e:
+        import traceback
+        traceback.print_exc()
+        print("🔥 ROADMAP ERROR:", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 
