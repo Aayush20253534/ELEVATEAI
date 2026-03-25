@@ -118,11 +118,9 @@ const Hero = () => (
     <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
   </button>
 </Link>
-          <Link to="/Roadmap2">
-  <button className="flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 text-white border border-white/10 font-semibold px-8 py-3 rounded-xl transition-all">
-    <Sparkles size={18} className="text-blue-400" /> Blue Collar Jobs
-  </button>
-</Link>
+          <button className="flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 text-white border border-white/10 font-semibold px-8 py-3 rounded-xl transition-all">
+            <Sparkles size={18} className="text-blue-400" /> Blue Collar Jobs
+          </button>
         </div>
       </FadeIn>
 
