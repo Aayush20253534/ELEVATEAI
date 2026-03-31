@@ -121,9 +121,11 @@ Elevate AI follows a **modular AI-driven client-server architecture**:
 - Multi-API orchestration  
 
 ### 🔹 External APIs
-- **Grok** → reasoning, roadmap, questions  
-- **Tavily** → resource retrieval  
+- **Grok** → reasoning, roadmap generation, interview questions  
+- **Tavily** → retrieval of learning resources  
 - **Gemini** → video + resume analysis  
+- **Apify** → scraping job listings from platforms like Naukri  
+- **SerpAPI** → fetching job results from web search (Google Jobs, etc.)
 
 ### 🔹 Database (SQLite)
 - User data, resumes, chats  
