@@ -245,12 +245,12 @@ export default function ElevateFeed() {
     const cache = getPageCache();
 
     // Fetch /me only if not cached
-    if (!cache["feed:user"]) {
+    if (!cache[`feed:user:${token}`]) {
       axios.get(`${API}/me`, { headers: { Authorization: `Bearer ${token}` } })
-        .then(res => { cache["feed:user"] = res.data; setUser(res.data); })
+        .then(res => { cache[`feed:user:${token}`] = res.data; setUser(res.data); })
         .catch(() => {});
     } else {
-      setUser(cache["feed:user"]);
+      setUser(cache[`feed:user:${token}`]);
     }
 
     fetchFeed(0, false);

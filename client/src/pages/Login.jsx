@@ -181,7 +181,7 @@ function Login() {
 
       localStorage.setItem("token",token);
       localStorage.setItem("user",JSON.stringify(user));
-
+      window.__ELEVATEAI_PAGE_CACHE__ = {}; 
       navigate("/dashboard");
 
     }catch(error){
