@@ -4,7 +4,7 @@ import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Send, Search, MoreVertical, Paperclip, Smile, 
-  ChevronLeft, CheckCheck, SearchIcon, Plus
+  ChevronLeft, CheckCheck, SearchIcon, Plus, Reply
 } from 'lucide-react';
 import Sidebar from '../components/sidebar';
 import { Users } from "lucide-react";
@@ -116,7 +116,7 @@ const FriendsPopup = ({ onClose, navigate }) => {
 };
 
 // ─── MessageBubble — no motion on mount (instant render) ─────────────────────
-const MessageBubble = React.memo(({ message, isMe, onDelete, searchQuery, theme, navigate }) => {
+const MessageBubble = React.memo(({ message, isMe, onDelete, onReply, searchQuery, theme, navigate }) => {
   const [showMenu, setShowMenu] = useState(false);
 
   const renderedText = useMemo(() => {
@@ -129,6 +129,12 @@ const MessageBubble = React.memo(({ message, isMe, onDelete, searchQuery, theme,
         : part
     );
   }, [message.message, searchQuery]);
+
+  const replyPreview = useMemo(() => {
+    if (!message.reply_to_message_id) return null;
+    const text = message.reply_to_message || message.reply_to_file_name || message.reply_to_file_type || "Message";
+    return String(text).length > 90 ? `${String(text).slice(0, 90)}…` : String(text);
+  }, [message.reply_to_message_id, message.reply_to_message, message.reply_to_file_name, message.reply_to_file_type]);
 
   return (
     <div className={`flex w-full mb-2 gap-2 ${isMe ? "justify-end" : "justify-start"}`}>
@@ -149,11 +155,28 @@ const MessageBubble = React.memo(({ message, isMe, onDelete, searchQuery, theme,
             <MoreVertical size={14} />
           </button>
           {showMenu && (
-            <div className="absolute right-0 mt-1 w-28 bg-[#111827] border border-slate-700 rounded-lg shadow-lg z-50">
+            <div className="absolute right-0 mt-1 w-32 bg-[#111827] border border-slate-700 rounded-lg shadow-lg z-50 overflow-hidden">
+              <button
+                onClick={() => { onReply(message); setShowMenu(false); }}
+                className="w-full text-left px-3 py-2 text-xs hover:bg-indigo-500/10 text-indigo-300 flex items-center gap-2"
+              >
+                <Reply size={12} /> Reply
+              </button>
               <button onClick={() => onDelete(message.id, isMe)} className="w-full text-left px-3 py-2 text-xs hover:bg-red-500/10 text-red-400">Delete</button>
             </div>
           )}
         </div>
+
+        {replyPreview && (
+          <div className={`mb-2 rounded-lg border-l-4 px-3 py-2 text-xs ${
+            isMe ? "bg-indigo-700/50 border-indigo-300 text-indigo-100" : "bg-black/20 border-slate-500 text-slate-300"
+          }`}>
+            <div className="font-semibold opacity-90">
+              Replying to {message.reply_to_sender_id === message.sender_id ? "themself" : (message.reply_to_sender_name || "message")}
+            </div>
+            <div className="truncate opacity-80">{replyPreview}</div>
+          </div>
+        )}
 
         {message.message && <p className="text-[14.5px] leading-relaxed whitespace-pre-wrap">{renderedText}</p>}
 
@@ -252,6 +275,7 @@ export default function ElevateAIChat() {
   const [inputText, setInputText]       = useState("");
   const [receiver, setReceiver]         = useState(null);
   const [selectedFile, setSelectedFile] = useState(null);
+  const [replyTo, setReplyTo]           = useState(null);
   const [showFriends, setShowFriends]   = useState(false);
   const [requestCount, setRequestCount] = useState(0);
 
@@ -334,6 +358,7 @@ export default function ElevateAIChat() {
   useEffect(() => {
     if (!receiver_id) return;
     setMessages([]); // clear previous chat instantly on switch
+    setReplyTo(null);
     fetchMessages();
     clearInterval(pollRef.current);
     pollRef.current = setInterval(fetchMessages, 8000);
@@ -400,16 +425,25 @@ export default function ElevateAIChat() {
       file_url: selectedFile ? URL.createObjectURL(selectedFile) : null,
       file_type: selectedFile?.type,
       timestamp: new Date().toISOString(),
+      reply_to_message_id: replyTo?.id || null,
+      reply_to_message: replyTo?.message || null,
+      reply_to_file_name: replyTo?.file_name || null,
+      reply_to_file_type: replyTo?.file_type || null,
+      reply_to_sender_id: replyTo?.sender_id || null,
+      reply_to_sender_name: replyTo?.sender_name || null,
     };
 
     setMessages(prev => [...prev, tempMsg]);
     setInputText("");
     const fileToSend = selectedFile;
+    const replyTarget = replyTo;
     setSelectedFile(null);
+    setReplyTo(null);
 
     const formData = new FormData();
     formData.append("receiver_id", String(receiver_id));
     if (tempMsg.message) formData.append("message", tempMsg.message);
+    if (replyTarget?.id) formData.append("reply_to_message_id", String(replyTarget.id));
     if (fileToSend) formData.append("file", fileToSend);
 
     try {
@@ -422,7 +456,7 @@ export default function ElevateAIChat() {
       setMessages(chatRes.data.map(m => ({ ...m, timestamp: m.created_at })));
       setInbox(inboxRes.data);
     } catch {}
-  }, [inputText, selectedFile, currentUserId, receiver_id, token]);
+  }, [inputText, selectedFile, replyTo, currentUserId, receiver_id, token]);
 
   const filteredMessages = useMemo(() => {
     if (!searchQuery.trim()) return messages;
@@ -557,6 +591,7 @@ export default function ElevateAIChat() {
                     message={msg}
                     isMe={msg.sender_id === currentUserId}
                     onDelete={handleDelete}
+                    onReply={setReplyTo}
                     searchQuery={searchQuery}
                     theme={currentTheme}
                     navigate={navigate}
@@ -567,6 +602,19 @@ export default function ElevateAIChat() {
 
               {/* Input */}
               <footer className={`p-3 ${currentTheme.panel}/30 border-t border-slate-800/50`}>
+                {replyTo && (
+                  <div className="max-w-6xl mx-auto mb-2 flex items-center justify-between rounded-xl bg-[#111827] border border-indigo-500/30 px-3 py-2">
+                    <div className="min-w-0 text-xs">
+                      <div className="flex items-center gap-2 text-indigo-300 font-semibold">
+                        <Reply size={14} /> Replying to {replyTo.sender_id === currentUserId ? "yourself" : (replyTo.sender_name || receiver?.name || "message")}
+                      </div>
+                      <div className="text-slate-400 truncate mt-0.5">
+                        {replyTo.message || replyTo.file_name || replyTo.file_type || "Message"}
+                      </div>
+                    </div>
+                    <button type="button" onClick={() => setReplyTo(null)} className="text-slate-400 hover:text-white px-2">✕</button>
+                  </div>
+                )}
                 <form onSubmit={handleSend} className="max-w-6xl mx-auto flex items-center gap-2">
                   <input id="fileInput" type="file" hidden onChange={(e) => setSelectedFile(e.target.files[0])} />
                   <div className="flex gap-1 text-slate-400">

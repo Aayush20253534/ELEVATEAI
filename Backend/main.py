@@ -464,7 +464,8 @@ def init_db():
         is_read INTEGER DEFAULT 0,
         file_url TEXT,
         file_type TEXT,
-        file_name TEXT
+        file_name TEXT,
+        reply_to_message_id INTEGER
     )
     """)
 
@@ -576,6 +577,7 @@ def init_db():
         ('file_url', 'TEXT'),
         ('file_type', 'TEXT'),
         ('file_name', 'TEXT'),
+        ('reply_to_message_id', 'INTEGER'),
     ]
 
     for column_name, column_type in direct_message_columns:
@@ -662,6 +664,7 @@ def init_db():
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_direct_messages_sender_receiver ON direct_messages(sender_id, receiver_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_direct_messages_created_at ON direct_messages(created_at)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_direct_messages_receiver_read ON direct_messages(receiver_id, is_read)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_direct_messages_reply_to ON direct_messages(reply_to_message_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_profile_views_log_viewer_viewed ON profile_views_log(viewer_id, viewed_id)")
 
     conn.commit()
@@ -2058,6 +2061,7 @@ class SendMessage(BaseModel):
 async def send_message(
     receiver_id: int = Form(...),
     message: str = Form(""),
+    reply_to_message_id: int = Form(None),
     file: UploadFile = File(None),
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ):
@@ -2111,6 +2115,28 @@ async def send_message(
         if not message and not file:
             raise HTTPException(status_code=400, detail="Message or file required")
 
+        # ↩️ Validate replied message belongs to this exact conversation.
+        # This prevents users from replying to random message IDs from other chats,
+        # because apparently databases need boundaries and humans need supervision.
+        if reply_to_message_id is not None:
+            cursor.execute(
+                """
+                SELECT id
+                FROM direct_messages
+                WHERE id=%s
+                  AND (
+                        (sender_id=%s AND receiver_id=%s)
+                        OR
+                        (sender_id=%s AND receiver_id=%s)
+                  )
+                  AND NOT (COALESCE(deleted_for_sender, 0)=1 AND COALESCE(deleted_for_receiver, 0)=1)
+                LIMIT 1
+                """,
+                (reply_to_message_id, sender_id, receiver_id, receiver_id, sender_id),
+            )
+            if not cursor.fetchone():
+                raise HTTPException(status_code=400, detail="Invalid reply target")
+
         file_url = None
         file_type = None
         file_name = None
@@ -2161,8 +2187,8 @@ async def send_message(
         cursor.execute(
             """
             INSERT INTO direct_messages
-            (sender_id, receiver_id, message, file_url, file_type, file_name, created_at, is_read, deleted_for_sender, deleted_for_receiver)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, 0, 0, 0)
+            (sender_id, receiver_id, message, file_url, file_type, file_name, reply_to_message_id, created_at, is_read, deleted_for_sender, deleted_for_receiver)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 0, 0, 0)
             RETURNING id, created_at
             """,
             (
@@ -2172,6 +2198,7 @@ async def send_message(
                 file_url,
                 file_type,
                 file_name,
+                reply_to_message_id,
                 datetime.utcnow().isoformat(),
             ),
         )
@@ -2188,6 +2215,7 @@ async def send_message(
                 "file": file_url,
                 "file_type": file_type,
                 "file_name": file_name,
+                "reply_to_message_id": reply_to_message_id,
                 "created_at": saved["created_at"] if saved else None,
             },
         }
@@ -2960,15 +2988,22 @@ def get_messages(
             (user_id, current_user_id),
         )
 
-        # 💬 fetch messages
+        # 💬 fetch messages + replied-message preview
         cursor.execute(
             """
             SELECT
                 dm.*,
                 u.profile_image,
-                u.name as sender_name
+                u.name AS sender_name,
+                replied.message AS reply_to_message,
+                replied.file_name AS reply_to_file_name,
+                replied.file_type AS reply_to_file_type,
+                replied.sender_id AS reply_to_sender_id,
+                replied_user.name AS reply_to_sender_name
             FROM direct_messages dm
             JOIN users u ON dm.sender_id = u.id
+            LEFT JOIN direct_messages replied ON replied.id = dm.reply_to_message_id
+            LEFT JOIN users replied_user ON replied_user.id = replied.sender_id
             WHERE
             (
                 dm.sender_id=%s
