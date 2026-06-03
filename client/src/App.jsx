@@ -1,22 +1,22 @@
 import React from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 
-import LandingPage from "./pages/landingpage";
-import Login from "./pages/login";
-import Dashboard from "./pages/Dashboard";
-import ResumeAnalyzer from "./pages/ResumeAnalyzer";
-import Interview from "./pages/Interview";
-import FindJobs from "./pages/Find_jobs";
-import ResumeBuilder from "./pages/ResumeBuilder";
-import SkillRoadmap from "./pages/Roadmap";
-import ProfilePage from "./pages/profile";
-import LeaderboardPage from "./pages/leaderboard";
-import AboutPage from "./components/About";
-import LegalPage from "./components/Policy";
-import PlatformPage from "./components/Platform";
-import ElevateAIChat from "./pages/messages";
-import ElevateFeed from "./pages/feed";
-import SkillRoadmap2 from "./pages/Roadmap2";
+import LandingPage from "./pages/landingpage.jsx";
+import Login from "./pages/Login.jsx";
+import Dashboard from "./pages/Dashboard.jsx";
+import ResumeAnalyzer from "./pages/ResumeAnalyzer.jsx";
+import Interview from "./pages/Interview.jsx";
+import FindJobs from "./pages/Find_jobs.jsx";
+import ResumeBuilder from "./pages/ResumeBuilder.jsx";
+import SkillRoadmap from "./pages/Roadmap.jsx";
+import ProfilePage from "./pages/profile.jsx";
+import LeaderboardPage from "./pages/leaderboard.jsx";
+import AboutPage from "./components/About.jsx";
+import LegalPage from "./components/Policy.jsx";
+import PlatformPage from "./components/Platform.jsx";
+import ElevateAIChat from "./pages/messages.jsx";
+import ElevateFeed from "./pages/feed.jsx";
+import SkillRoadmap2 from "./pages/Roadmap2.jsx";
 
 const ProtectedRoute = ({ children }) => {
   const user = localStorage.getItem("user");
