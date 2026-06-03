@@ -84,7 +84,7 @@ const UserCard = ({ user, rank, onClick, navigate, currentUser }) => {
     <div className="flex-1 text-center md:text-left">
       <div className="flex items-center justify-center md:justify-start gap-3">
         <h3 className="text-lg font-bold text-white group-hover:text-blue-400 transition-colors">
-          {user.name}
+          {user.name} {isSelf && <span className="text-xs text-cyan-400 ml-2">You</span>}
         </h3>
         <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
           <Zap size={10} className="text-emerald-400 fill-emerald-400" />
@@ -237,11 +237,18 @@ const LeaderboardPage = () => {
   useEffect(() => {
     const fetchLeaderboard = async () => {
       try {
-        const res = await axios.get(`${API}/api/leaderboard`, {
-  headers: {
-    Authorization: `Bearer ${localStorage.getItem("token")}`
-  }
-});
+        const token = localStorage.getItem("token");
+        if (!token) {
+          navigate("/login");
+          return;
+        }
+
+        const res = await axios.get(`${API}/api/leaderboard?limit=100&offset=0`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+
+        setCurrentUser(res.data.currentUser || null);
+
         const rawUsers = res.data?.users || [];
         const processedUsers = rawUsers.map(u => {
           const p = u.projectsBuilt || 0;
@@ -255,32 +262,17 @@ const LeaderboardPage = () => {
             relevancyScore: (p * 50) + (m * 20) + (s * 30)
           };
         });
+
         setUsers(processedUsers);
-        setTotalUsers(res.data.totalUsers || 0);
+        setTotalUsers(res.data.totalUsers || processedUsers.length || 0);
         setTrendingSkill(res.data.trendingSkill || "None");
       } catch (err) {
         console.error("Leaderboard fetch error:", err);
       }
     };
+
     fetchLeaderboard();
-  }, []);
-
-  useEffect(() => {
-  const fetchMe = async () => {
-    try {
-      const res = await axios.get(`${API}/me`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`
-        }
-      });
-      setCurrentUser(res.data);
-    } catch (err) {
-      console.error("User fetch error:", err);
-    }
-  };
-
-  fetchMe();
-}, []);
+  }, [navigate]);
   const filteredUsers = useMemo(() => {
     return users
       .filter(u =>

@@ -12,14 +12,17 @@ from datetime import datetime, timedelta
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import HumanMessage
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, Form, Query
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from Roadmap import Roadmap
 from dotenv import load_dotenv
 from fastapi.staticfiles import StaticFiles
 from transformers import pipeline
+from pathlib import Path
+import psycopg2
+from psycopg2.extras import RealDictCursor
 
-import sqlite3
+
 import uuid
 import tempfile
 import torch
@@ -55,25 +58,30 @@ def get_asr_pipeline():
     return asr_pipeline
 
 
-# -------- CREATE DIRECTORIES FIRST -------- #
-UPLOAD_DIR = "uploads"
-PROFILE_DIR = "profile_images"
-RESUME_DIR = "resume"
+# -------- PATH CONFIG -------- #
+# Keeps backend files stable even when Backend/ is moved outside client/.
+BASE_DIR = Path(__file__).resolve().parent
 
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-os.makedirs(PROFILE_DIR, exist_ok=True)
-os.makedirs(RESUME_DIR, exist_ok=True)
+UPLOAD_DIR = BASE_DIR / "uploads"
+PROFILE_DIR = BASE_DIR / "profile_images"
+RESUME_DIR = BASE_DIR / "resume"
+
+ENV_PATH = BASE_DIR / ".env"
+
+UPLOAD_DIR.mkdir(exist_ok=True)
+PROFILE_DIR.mkdir(exist_ok=True)
+RESUME_DIR.mkdir(exist_ok=True)
 
 # -------- INIT APP -------- #
 app = FastAPI()
 roadmap_engine = Roadmap()
 
 # -------- MOUNT AFTER CREATION -------- #
-app.mount("/images", StaticFiles(directory=PROFILE_DIR), name="images")
-app.mount("/resume-files", StaticFiles(directory=RESUME_DIR), name="resume-files")
-app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
+app.mount("/images", StaticFiles(directory=str(PROFILE_DIR)), name="images")
+app.mount("/resume-files", StaticFiles(directory=str(RESUME_DIR)), name="resume-files")
+app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 
-load_dotenv()
+load_dotenv(dotenv_path=ENV_PATH)
 
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
@@ -178,8 +186,22 @@ structured_llm = llm.with_structured_output(MarketReadiness)
 
 
 def get_db():
-    conn = sqlite3.connect("users.db", check_same_thread=False)
-    conn.row_factory = sqlite3.Row
+    database_url = os.getenv("DATABASE_URL")
+
+    if not database_url:
+        raise Exception("DATABASE_URL not set in Backend/.env")
+
+    # PostgreSQL only. No SQLite fallback, no users.db creation.
+    if database_url.startswith("sqlite") or database_url.endswith(".db"):
+        raise Exception("SQLite is disabled. Set DATABASE_URL to a PostgreSQL URL.")
+
+    if not (database_url.startswith("postgresql://") or database_url.startswith("postgres://")):
+        raise Exception("DATABASE_URL must be PostgreSQL, for example postgresql://user:password@host:5432/dbname")
+
+    conn = psycopg2.connect(
+        database_url,
+        cursor_factory=RealDictCursor
+    )
     return conn
 
 
@@ -310,6 +332,28 @@ Rules:
     response = llm.invoke([message])
     return response.content
 
+
+def safe_json_loads(value, default=None):
+    if default is None:
+        default = []
+    if not value:
+        return default
+    if isinstance(value, (list, dict)):
+        return value
+    try:
+        return json.loads(value)
+    except Exception:
+        return default
+
+
+def row_get(row, key, default=None):
+    if not row:
+        return default
+    try:
+        return row.get(key, default)
+    except AttributeError:
+        return row[key] if key in row else default
+
 # ---------------- CORS ---------------- #
 
 app.add_middleware(
@@ -323,13 +367,12 @@ app.add_middleware(
 
 # ---------------- DATABASE ---------------- #
 def init_db():
-    conn = sqlite3.connect("users.db")
+    conn = get_db()
     cursor = conn.cursor()
 
-    cursor.execute(
-        """
+    cursor.execute("""
     CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id SERIAL PRIMARY KEY,
         name TEXT,
         username TEXT,
         email TEXT UNIQUE,
@@ -337,7 +380,7 @@ def init_db():
         phone TEXT,
         bio TEXT,
         linkedin TEXT,
-        current_role TEXT,
+        "current_role" TEXT,
         target_role TEXT,
         best_job_role TEXT,
         professional_links TEXT,
@@ -352,142 +395,234 @@ def init_db():
         roadmap TEXT,
         created_at TEXT,
         last_active_date TEXT,
-        learning_streak INTEGER DEFAULT 0
+        learning_streak INTEGER DEFAULT 0,
+        profile_views INTEGER DEFAULT 0,
+        login_streak INTEGER DEFAULT 1,
+        last_login_date TEXT
     )
-    """
-    )
+    """)
 
-    cursor.execute(
-        """
+    cursor.execute("""
     CREATE TABLE IF NOT EXISTS chat_messages (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id SERIAL PRIMARY KEY,
         user_email TEXT,
         role TEXT,
         message TEXT,
         response_time REAL,
         created_at TEXT
     )
-    """
-    )
+    """)
 
-    cursor.execute(
-        """
+    cursor.execute("""
     CREATE TABLE IF NOT EXISTS direct_messages (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id SERIAL PRIMARY KEY,
         sender_id INTEGER,
         receiver_id INTEGER,
         message TEXT,
         created_at TEXT,
         deleted_for_sender INTEGER DEFAULT 0,
         deleted_for_receiver INTEGER DEFAULT 0,
-        is_read INTEGER DEFAULT 0
+        is_read INTEGER DEFAULT 0,
+        file_url TEXT,
+        file_type TEXT,
+        file_name TEXT
     )
-    """
-    )
+    """)
 
-    cursor.execute(
-        """
-CREATE TABLE IF NOT EXISTS feed_posts (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_email TEXT,
-    content TEXT,
-    type TEXT,
-    tags TEXT,
-    image TEXT,
-    created_at TEXT
-)
-    """
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS feed_posts (
+        id SERIAL PRIMARY KEY,
+        user_email TEXT,
+        content TEXT,
+        type TEXT,
+        tags TEXT,
+        image TEXT,
+        created_at TEXT
     )
+    """)
 
-    cursor.execute(
-        """
-CREATE TABLE IF NOT EXISTS post_likes (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    post_id INTEGER,
-    user_email TEXT,
-    UNIQUE(post_id, user_email)
-)
-"""
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS post_likes (
+        id SERIAL PRIMARY KEY,
+        post_id INTEGER,
+        user_email TEXT,
+        UNIQUE(post_id, user_email)
     )
+    """)
 
-    cursor.execute(
-        """
-CREATE TABLE IF NOT EXISTS post_comments (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    post_id INTEGER,
-    user_email TEXT,
-    comment TEXT,
-    created_at TEXT
-)
-"""
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS post_comments (
+        id SERIAL PRIMARY KEY,
+        post_id INTEGER,
+        user_email TEXT,
+        comment TEXT,
+        created_at TEXT
     )
-    cursor.execute(
-        """
- CREATE TABLE IF NOT EXISTS friend_requests (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    sender_id INTEGER,
-    receiver_id INTEGER,
-    status TEXT DEFAULT 'pending',
-    created_at TEXT
-)
-"""
-    )
-    cursor.execute(
-        """
-CREATE TABLE IF NOT EXISTS profile_views_log (
-    viewer_id INTEGER,
-    viewed_id INTEGER,
-    viewed_at TEXT
-)
-"""
-    )
+    """)
 
-    try:
-        cursor.execute(
-            "ALTER TABLE direct_messages ADD COLUMN deleted_for_sender INTEGER DEFAULT 0"
-        )
-    except:
-        pass
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS friend_requests (
+        id SERIAL PRIMARY KEY,
+        sender_id INTEGER,
+        receiver_id INTEGER,
+        status TEXT DEFAULT 'pending',
+        created_at TEXT
+    )
+    """)
 
-    try:
-        cursor.execute(
-            "ALTER TABLE direct_messages ADD COLUMN deleted_for_receiver INTEGER DEFAULT 0"
-        )
-    except:
-        pass
-    try:
-        cursor.execute("ALTER TABLE direct_messages ADD COLUMN file_url TEXT")
-    except:
-        pass
-    try:
-        cursor.execute("ALTER TABLE direct_messages ADD COLUMN file_type TEXT")
-    except:
-        pass
-    try:
-        cursor.execute("ALTER TABLE direct_messages ADD COLUMN file_name TEXT")
-    except:
-        pass
-    try:
-        cursor.execute("ALTER TABLE feed_posts ADD COLUMN image TEXT")
-    except:
-        pass
-    try:
-        cursor.execute("ALTER TABLE users ADD COLUMN profile_views INTEGER DEFAULT 0")
-    except:
-        pass
-    try:
-        cursor.execute("ALTER TABLE users ADD COLUMN login_streak INTEGER DEFAULT 1")
-    except:
-        pass
-    try:
-        cursor.execute("ALTER TABLE users ADD COLUMN last_login_date TEXT")
-    except:
-        pass
-    try:
-        cursor.execute("ALTER TABLE direct_messages ADD COLUMN is_read INTEGER DEFAULT 0")
-    except:
-        pass
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS profile_views_log (
+        viewer_id INTEGER,
+        viewed_id INTEGER,
+        viewed_at TEXT
+    )
+    """)
+
+    # ---------------- SAFE POSTGRES MIGRATIONS ---------------- #
+    # CREATE TABLE IF NOT EXISTS does NOT add new columns to an existing table.
+    # These ALTER statements keep older databases compatible after code/schema changes.
+    user_columns = [
+        ('name', 'TEXT'),
+        ('username', 'TEXT'),
+        ('email', 'TEXT'),
+        ('password', 'TEXT'),
+        ('phone', 'TEXT'),
+        ('bio', 'TEXT'),
+        ('linkedin', 'TEXT'),
+        ('current_role', 'TEXT'),
+        ('target_role', 'TEXT'),
+        ('best_job_role', 'TEXT'),
+        ('professional_links', 'TEXT'),
+        ('profile_image', 'TEXT'),
+        ('cover_image', 'TEXT'),
+        ('market_readiness', 'TEXT'),
+        ('skills', 'TEXT'),
+        ('projects', 'TEXT'),
+        ('certifications', 'TEXT'),
+        ('resume', 'TEXT'),
+        ('resume_analysis', 'TEXT'),
+        ('roadmap', 'TEXT'),
+        ('created_at', 'TEXT'),
+        ('last_active_date', 'TEXT'),
+        ('learning_streak', 'INTEGER DEFAULT 0'),
+        ('profile_views', 'INTEGER DEFAULT 0'),
+        ('login_streak', 'INTEGER DEFAULT 1'),
+        ('last_login_date', 'TEXT'),
+    ]
+
+    for column_name, column_type in user_columns:
+        safe_column = column_name.replace('"', '""')
+        cursor.execute(f'ALTER TABLE users ADD COLUMN IF NOT EXISTS "{safe_column}" {column_type}')
+
+    chat_message_columns = [
+        ('user_email', 'TEXT'),
+        ('role', 'TEXT'),
+        ('message', 'TEXT'),
+        ('response_time', 'REAL'),
+        ('created_at', 'TEXT'),
+    ]
+
+    for column_name, column_type in chat_message_columns:
+        safe_column = column_name.replace('"', '""')
+        cursor.execute(f'ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS "{safe_column}" {column_type}')
+
+    direct_message_columns = [
+        ('sender_id', 'INTEGER'),
+        ('receiver_id', 'INTEGER'),
+        ('message', 'TEXT'),
+        ('created_at', 'TEXT'),
+        ('deleted_for_sender', 'INTEGER DEFAULT 0'),
+        ('deleted_for_receiver', 'INTEGER DEFAULT 0'),
+        ('is_read', 'INTEGER DEFAULT 0'),
+        ('file_url', 'TEXT'),
+        ('file_type', 'TEXT'),
+        ('file_name', 'TEXT'),
+    ]
+
+    for column_name, column_type in direct_message_columns:
+        safe_column = column_name.replace('"', '""')
+        cursor.execute(f'ALTER TABLE direct_messages ADD COLUMN IF NOT EXISTS "{safe_column}" {column_type}')
+
+    feed_post_columns = [
+        ('user_email', 'TEXT'),
+        ('content', 'TEXT'),
+        ('type', 'TEXT'),
+        ('tags', 'TEXT'),
+        ('image', 'TEXT'),
+        ('created_at', 'TEXT'),
+    ]
+
+    for column_name, column_type in feed_post_columns:
+        safe_column = column_name.replace('"', '""')
+        cursor.execute(f'ALTER TABLE feed_posts ADD COLUMN IF NOT EXISTS "{safe_column}" {column_type}')
+
+    post_like_columns = [
+        ('post_id', 'INTEGER'),
+        ('user_email', 'TEXT'),
+    ]
+
+    for column_name, column_type in post_like_columns:
+        safe_column = column_name.replace('"', '""')
+        cursor.execute(f'ALTER TABLE post_likes ADD COLUMN IF NOT EXISTS "{safe_column}" {column_type}')
+
+    post_comment_columns = [
+        ('post_id', 'INTEGER'),
+        ('user_email', 'TEXT'),
+        ('comment', 'TEXT'),
+        ('created_at', 'TEXT'),
+    ]
+
+    for column_name, column_type in post_comment_columns:
+        safe_column = column_name.replace('"', '""')
+        cursor.execute(f'ALTER TABLE post_comments ADD COLUMN IF NOT EXISTS "{safe_column}" {column_type}')
+
+    friend_request_columns = [
+        ('sender_id', 'INTEGER'),
+        ('receiver_id', 'INTEGER'),
+        ('status', "TEXT DEFAULT 'pending'"),
+        ('created_at', 'TEXT'),
+    ]
+
+    for column_name, column_type in friend_request_columns:
+        safe_column = column_name.replace('"', '""')
+        cursor.execute(f'ALTER TABLE friend_requests ADD COLUMN IF NOT EXISTS "{safe_column}" {column_type}')
+
+    profile_view_columns = [
+        ('viewer_id', 'INTEGER'),
+        ('viewed_id', 'INTEGER'),
+        ('viewed_at', 'TEXT'),
+    ]
+
+    for column_name, column_type in profile_view_columns:
+        safe_column = column_name.replace('"', '""')
+        cursor.execute(f'ALTER TABLE profile_views_log ADD COLUMN IF NOT EXISTS "{safe_column}" {column_type}')
+
+    cursor.execute("UPDATE users SET username = COALESCE(username, name, email, 'User') WHERE username IS NULL OR username = ''")
+    cursor.execute("UPDATE users SET professional_links = '[]' WHERE professional_links IS NULL OR professional_links = ''")
+    cursor.execute("UPDATE users SET skills = '[]' WHERE skills IS NULL OR skills = ''")
+    cursor.execute("UPDATE users SET projects = '[]' WHERE projects IS NULL OR projects = ''")
+    cursor.execute("UPDATE users SET certifications = '[]' WHERE certifications IS NULL OR certifications = ''")
+    cursor.execute("UPDATE users SET roadmap = '[]' WHERE roadmap IS NULL OR roadmap = ''")
+    cursor.execute("UPDATE users SET learning_streak = 0 WHERE learning_streak IS NULL")
+    cursor.execute("UPDATE users SET profile_views = 0 WHERE profile_views IS NULL")
+    cursor.execute("UPDATE users SET login_streak = 1 WHERE login_streak IS NULL")
+
+    # ---------------- PERFORMANCE INDEXES ---------------- #
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_profile_views ON users(profile_views)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_feed_posts_created_at ON feed_posts(created_at)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_feed_posts_user_email ON feed_posts(user_email)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_post_likes_post_id ON post_likes(post_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_post_likes_user_email ON post_likes(user_email)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_post_comments_post_id ON post_comments(post_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_friend_requests_sender_receiver ON friend_requests(sender_id, receiver_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_friend_requests_status ON friend_requests(status)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_direct_messages_sender_receiver ON direct_messages(sender_id, receiver_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_direct_messages_created_at ON direct_messages(created_at)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_profile_views_log_viewer_viewed ON profile_views_log(viewer_id, viewed_id)")
+
     conn.commit()
+    cursor.close()
     conn.close()
 
 
@@ -644,7 +779,7 @@ def signup(data: SignupRequest):
     conn = get_db()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT * FROM users WHERE email = ?", (data.email,))
+    cursor.execute("SELECT * FROM users WHERE email = %s", (data.email,))
     existing_user = cursor.fetchone()
 
     if existing_user:
@@ -666,7 +801,7 @@ def signup(data: SignupRequest):
             password,
             phone,
             bio,
-            current_role,
+            "current_role",
             target_role,
             professional_links,
             created_at,
@@ -675,7 +810,7 @@ def signup(data: SignupRequest):
             login_streak,
             last_login_date
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """,
         (
             data.name,
@@ -713,27 +848,27 @@ def like_post(
 
     # 🔍 check if already liked
     cursor.execute(
-        "SELECT * FROM post_likes WHERE post_id=? AND user_email=?", (post_id, email)
+        "SELECT * FROM post_likes WHERE post_id=%s AND user_email=%s", (post_id, email)
     )
     existing = cursor.fetchone()
 
     if existing:
         # ❌ unlike
         cursor.execute(
-            "DELETE FROM post_likes WHERE post_id=? AND user_email=?", (post_id, email)
+            "DELETE FROM post_likes WHERE post_id=%s AND user_email=%s", (post_id, email)
         )
         liked = False
     else:
         # ❤️ like
         cursor.execute(
-            "INSERT INTO post_likes (post_id, user_email) VALUES (?, ?)",
+            "INSERT INTO post_likes (post_id, user_email) VALUES (%s, %s)",
             (post_id, email),
         )
         liked = True
 
     # 🔢 get updated like count
-    cursor.execute("SELECT COUNT(*) FROM post_likes WHERE post_id=?", (post_id,))
-    likes = cursor.fetchone()[0]
+    cursor.execute("SELECT COUNT(*) AS count FROM post_likes WHERE post_id=%s", (post_id,))
+    likes = cursor.fetchone()["count"]
 
     conn.commit()
     conn.close()
@@ -759,7 +894,7 @@ def add_comment(
     cursor.execute(
         """
         INSERT INTO post_comments (post_id, user_email, comment, created_at)
-        VALUES (?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s)
     """,
         (post_id, email, data.comment, datetime.utcnow().isoformat()),
     )
@@ -780,7 +915,7 @@ def delete_comment(
     cursor = conn.cursor()
 
     # check ownership
-    cursor.execute("SELECT user_email FROM post_comments WHERE id=?", (comment_id,))
+    cursor.execute("SELECT user_email FROM post_comments WHERE id=%s", (comment_id,))
     comment = cursor.fetchone()
 
     if not comment:
@@ -789,7 +924,7 @@ def delete_comment(
     if comment["user_email"] != email:
         raise HTTPException(status_code=403, detail="Not allowed")
 
-    cursor.execute("DELETE FROM post_comments WHERE id=?", (comment_id,))
+    cursor.execute("DELETE FROM post_comments WHERE id=%s", (comment_id,))
 
     conn.commit()
     conn.close()
@@ -807,7 +942,7 @@ def delete_post(
     cursor = conn.cursor()
 
     # check ownership
-    cursor.execute("SELECT user_email FROM feed_posts WHERE id=?", (post_id,))
+    cursor.execute("SELECT user_email FROM feed_posts WHERE id=%s", (post_id,))
     post = cursor.fetchone()
 
     if not post:
@@ -817,11 +952,11 @@ def delete_post(
         raise HTTPException(status_code=403, detail="Not allowed")
 
     # delete related data first (IMPORTANT)
-    cursor.execute("DELETE FROM post_likes WHERE post_id=?", (post_id,))
-    cursor.execute("DELETE FROM post_comments WHERE post_id=?", (post_id,))
+    cursor.execute("DELETE FROM post_likes WHERE post_id=%s", (post_id,))
+    cursor.execute("DELETE FROM post_comments WHERE post_id=%s", (post_id,))
 
     # delete post
-    cursor.execute("DELETE FROM feed_posts WHERE id=?", (post_id,))
+    cursor.execute("DELETE FROM feed_posts WHERE id=%s", (post_id,))
 
     conn.commit()
     conn.close()
@@ -836,7 +971,7 @@ def login(data: LoginRequest):
     cursor = conn.cursor()
 
     cursor.execute(
-        "SELECT id, name, username, linkedin, email, password, last_active_date, learning_streak, login_streak, last_login_date FROM users WHERE email = ?",
+        "SELECT id, name, username, linkedin, email, password, last_active_date, learning_streak, login_streak, last_login_date FROM users WHERE email = %s",
         (data.email,),
     )
 
@@ -874,8 +1009,8 @@ def login(data: LoginRequest):
     cursor.execute(
         """
     UPDATE users
-    SET last_login_date=?, login_streak=?
-    WHERE email=?
+    SET last_login_date=%s, login_streak=%s
+    WHERE email=%s
 """,
         (today.isoformat(), login_streak, email),
     )
@@ -910,7 +1045,7 @@ def reset_roadmap_streak(credentials: HTTPAuthorizationCredentials = Depends(sec
         """
         UPDATE users
         SET learning_streak=0, last_active_date=NULL
-        WHERE email=?
+        WHERE email=%s
     """,
         (email,),
     )
@@ -979,57 +1114,57 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
     conn = get_db()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT * FROM users WHERE email = ?", (email,))
+    cursor.execute("SELECT * FROM users WHERE email = %s", (email,))
     user = cursor.fetchone()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     conn.close()
 
     resume_analysis = (
-        json.loads(user["resume_analysis"]) if user["resume_analysis"] else None
+        safe_json_loads(user.get("resume_analysis"), None)
     )
 
-    roadmap = json.loads(user["roadmap"]) if user["roadmap"] else []
+    roadmap = safe_json_loads(user.get("roadmap"), [])
     completed_modules = 0
     total_modules = 0
 
     for stage in roadmap:
-        for skill in stage["skills"]:
+        for skill in stage.get("skills", []):
             total_modules += 1
-            if skill["status"] == "Completed":
+            if skill.get("status") == "Completed":
                 completed_modules += 1
 
     milestone = get_next_milestone(roadmap)
 
     return {
-        "id": user["id"],
-        "name": user["name"],
-        "username": user["username"],
-        "email": user["email"],
-        "phone": user["phone"],
-        "bio": user["bio"],
-        "linkedin": user["linkedin"],
-        "current_role": user["current_role"],
-        "target_role": user["target_role"],
-        "profile_image": user["profile_image"],
-        "cover_image": user["cover_image"],
-        "resume": user["resume"],
+        "id": user.get("id"),
+        "name": user.get("name"),
+        "username": user.get("username"),
+        "email": user.get("email"),
+        "phone": user.get("phone"),
+        "bio": user.get("bio"),
+        "linkedin": user.get("linkedin"),
+        "current_role": user.get("current_role") or "",
+        "target_role": user.get("target_role"),
+        "profile_image": user.get("profile_image"),
+        "cover_image": user.get("cover_image"),
+        "resume": user.get("resume"),
         "resume_analysis": resume_analysis,
         "professional_links": (
-            json.loads(user["professional_links"]) if user["professional_links"] else []
+            safe_json_loads(user.get("professional_links"), [])
         ),
-        "market_readiness": user["market_readiness"],
-        "skills": json.loads(user["skills"]) if user["skills"] else [],
-        "projects": json.loads(user["projects"]) if user["projects"] else [],
+        "market_readiness": user.get("market_readiness"),
+        "skills": safe_json_loads(user.get("skills"), []),
+        "projects": safe_json_loads(user.get("projects"), []),
         "certifications": (
-            json.loads(user["certifications"]) if user["certifications"] else []
+            safe_json_loads(user.get("certifications"), [])
         ),
         "roadmap": roadmap,
         "next_milestone": milestone,
         "modules_completed": completed_modules,
         "modules_total": total_modules,
-        "learning_streak": user["learning_streak"],
-        "login_streak": user["login_streak"],
+        "learning_streak": user.get("learning_streak"),
+        "login_streak": user.get("login_streak"),
     }
 
 
@@ -1043,7 +1178,7 @@ def delete_conversation(
     cursor = conn.cursor()
 
     # 🔍 current user
-    cursor.execute("SELECT id FROM users WHERE email=?", (email,))
+    cursor.execute("SELECT id FROM users WHERE email=%s", (email,))
     current = cursor.fetchone()
 
     if not current:
@@ -1057,15 +1192,15 @@ def delete_conversation(
         UPDATE direct_messages
         SET 
             deleted_for_sender = CASE 
-                WHEN sender_id = ? THEN 1 ELSE deleted_for_sender 
+                WHEN sender_id = %s THEN 1 ELSE deleted_for_sender 
             END,
             deleted_for_receiver = CASE 
-                WHEN receiver_id = ? THEN 1 ELSE deleted_for_receiver 
+                WHEN receiver_id = %s THEN 1 ELSE deleted_for_receiver 
             END
         WHERE 
-            (sender_id=? AND receiver_id=?)
+            (sender_id=%s AND receiver_id=%s)
             OR
-            (sender_id=? AND receiver_id=?)
+            (sender_id=%s AND receiver_id=%s)
     """,
         (
             current_user_id,
@@ -1097,15 +1232,15 @@ def update_profile(
     cursor.execute(
         """
     UPDATE users
-    SET name=?,
-        username=?,
-        phone=?,
-        bio=?,
-        current_role=?,
-        target_role=?,
-        linkedin=?,
-        professional_links=?
-    WHERE email=?
+    SET name=%s,
+        username=%s,
+        phone=%s,
+        bio=%s,
+        "current_role"=%s,
+        target_role=%s,
+        linkedin=%s,
+        professional_links=%s
+    WHERE email=%s
 """,
         (
             data.name,
@@ -1136,7 +1271,7 @@ async def upload_profile_image(
 
     ext = file.filename.split(".")[-1]
     filename = f"{uuid.uuid4()}.{ext}"
-    path = os.path.join(PROFILE_DIR, filename)
+    path = PROFILE_DIR / filename
 
     contents = await file.read()
 
@@ -1147,7 +1282,7 @@ async def upload_profile_image(
     cursor = conn.cursor()
 
     cursor.execute(
-        "UPDATE users SET profile_image=? WHERE email=?", (f"/images/{filename}", email)
+        "UPDATE users SET profile_image=%s WHERE email=%s", (f"/images/{filename}", email)
     )
 
     conn.commit()
@@ -1167,7 +1302,7 @@ async def upload_cover_image(
 
     ext = file.filename.split(".")[-1]
     filename = f"{uuid.uuid4()}.{ext}"
-    path = os.path.join(PROFILE_DIR, filename)
+    path = PROFILE_DIR / filename
 
     contents = await file.read()
 
@@ -1178,7 +1313,7 @@ async def upload_cover_image(
     cursor = conn.cursor()
 
     cursor.execute(
-        "UPDATE users SET cover_image=? WHERE email=?", (f"/images/{filename}", email)
+        "UPDATE users SET cover_image=%s WHERE email=%s", (f"/images/{filename}", email)
     )
 
     conn.commit()
@@ -1197,7 +1332,7 @@ def get_user_roadmap(credentials: HTTPAuthorizationCredentials = Depends(securit
     conn = get_db()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT roadmap FROM users WHERE email=?", (email,))
+    cursor.execute("SELECT roadmap FROM users WHERE email=%s", (email,))
     row = cursor.fetchone()
 
     conn.close()
@@ -1220,12 +1355,9 @@ async def analyze_uploaded_resume(
         token = credentials.credentials
         email = verify_token(token)
 
-        upload_dir = "uploads"
-        os.makedirs(upload_dir, exist_ok=True)
-
         file_ext = file.filename.split(".")[-1]
         unique_name = f"{uuid.uuid4()}.{file_ext}"
-        file_path = os.path.join(upload_dir, unique_name)
+        file_path = UPLOAD_DIR / unique_name
 
         contents = await file.read()
 
@@ -1243,14 +1375,14 @@ async def analyze_uploaded_resume(
         cursor.execute(
             """
 UPDATE users
-SET market_readiness = ?,
-    skills = ?,
-    projects = ?,
-    certifications = ?,
-    target_role = ?,
-    resume_analysis = ?,
-    best_job_role = ?
-WHERE email = ?
+SET market_readiness = %s,
+    skills = %s,
+    projects = %s,
+    certifications = %s,
+    target_role = %s,
+    resume_analysis = %s,
+    best_job_role = %s
+WHERE email = %s
 """,
             (
                 report["market_readiness"],
@@ -1269,7 +1401,7 @@ WHERE email = ?
 
         return {
             "filename": unique_name,
-            "file_path": file_path,
+            "file_path": f"/uploads/{unique_name}",
             "ats_score": report["score"],
             "market_readiness": report["market_readiness"],
             "strengths": report["key_strengths"],
@@ -1298,7 +1430,7 @@ def get_best_job(credentials: HTTPAuthorizationCredentials = Depends(security)):
     conn = get_db()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT best_job_role FROM users WHERE email=?", (email,))
+    cursor.execute("SELECT best_job_role FROM users WHERE email=%s", (email,))
     row = cursor.fetchone()
 
     conn.close()
@@ -1380,7 +1512,7 @@ def get_jobs():
     #     except Exception as e:
     #         print("Job fetch error:", e)
 
-    return "Search to get job results"
+    return {"jobs": []}
 
 
 import time
@@ -1405,13 +1537,13 @@ def chat_ai(
 
     # store user message
     cursor.execute(
-        "INSERT INTO chat_messages (user_email, role, message, created_at) VALUES (?, ?, ?, ?)",
+        "INSERT INTO chat_messages (user_email, role, message, created_at) VALUES (%s, %s, %s, %s)",
         (email, "user", data.message, datetime.utcnow().isoformat()),
     )
 
     # store AI response
     cursor.execute(
-        "INSERT INTO chat_messages (user_email, role, message, response_time, created_at) VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO chat_messages (user_email, role, message, response_time, created_at) VALUES (%s, %s, %s, %s, %s)",
         (email, "ai", response, response_time, datetime.utcnow().isoformat()),
     )
 
@@ -1456,7 +1588,7 @@ def get_chat_history(credentials: HTTPAuthorizationCredentials = Depends(securit
     cursor = conn.cursor()
 
     cursor.execute(
-        "SELECT role, message, response_time FROM chat_messages WHERE user_email=? ORDER BY id",
+        "SELECT role, message, response_time FROM chat_messages WHERE user_email=%s ORDER BY id",
         (email,),
     )
 
@@ -1482,7 +1614,7 @@ def save_roadmap(
     cursor = conn.cursor()
 
     cursor.execute(
-        "UPDATE users SET roadmap=? WHERE email=?", (json.dumps(data.roadmap), email)
+        "UPDATE users SET roadmap=%s WHERE email=%s", (json.dumps(data.roadmap), email)
     )
 
     conn.commit()
@@ -1497,9 +1629,9 @@ def get_next_milestone(roadmap):
         return None
 
     for stage in roadmap:
-        for skill in stage["skills"]:
-            if skill["status"] != "Completed":
-                return {"stage": stage["title"], "skill": skill["name"]}
+        for skill in stage.get("skills", []):
+            if skill.get("status") != "Completed":
+                return {"stage": stage.get("title"), "skill": skill.get("name")}
 
     return None
 
@@ -1533,7 +1665,7 @@ async def upload_resume(
 
     ext = file.filename.split(".")[-1]
     filename = f"{uuid.uuid4()}.{ext}"
-    path = os.path.join(RESUME_DIR, filename)
+    path = RESUME_DIR / filename
 
     contents = await file.read()
 
@@ -1544,7 +1676,7 @@ async def upload_resume(
     cursor = conn.cursor()
 
     cursor.execute(
-        "UPDATE users SET resume=? WHERE email=?", (f"/resume-files/{filename}", email)
+        "UPDATE users SET resume=%s WHERE email=%s", (f"/resume-files/{filename}", email)
     )
 
     conn.commit()
@@ -1554,96 +1686,179 @@ async def upload_resume(
 
 
 @app.get("/api/leaderboard")
-def leaderboard(credentials: HTTPAuthorizationCredentials = Depends(security)):
-
+def leaderboard(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+):
     email = verify_token(credentials.credentials)
 
     conn = get_db()
     cursor = conn.cursor()
 
-    # 🔍 current user id
-    cursor.execute("SELECT id FROM users WHERE email=?", (email,))
-    current_user = cursor.fetchone()
-    current_user_id = current_user["id"]
+    try:
+        cursor.execute(
+            """
+            SELECT
+                id,
+                name,
+                username,
+                email,
+                COALESCE("current_role", target_role, best_job_role, 'Developer') AS current_role,
+                profile_image
+            FROM users
+            WHERE email=%s
+            """,
+            (email,),
+        )
+        current_user = cursor.fetchone()
 
-    # 🔍 fetch all users
-    cursor.execute(
-        """
-        SELECT 
-            id,
-            name,
-            current_role,
-            skills,
-            projects,
-            roadmap,
-            profile_image,
-            profile_views
-        FROM users
-    """
-    )
-    rows = cursor.fetchall()
+        if not current_user:
+            raise HTTPException(status_code=404, detail="User not found")
 
-    # 🔍 fetch all friendships
-    cursor.execute(
-        """
-        SELECT sender_id, receiver_id 
-        FROM friend_requests 
-        WHERE status='accepted'
-    """
-    )
-    friendships = cursor.fetchall()
+        current_user_id = current_user["id"]
 
-    conn.close()
+        cursor.execute("SELECT COUNT(*) AS count FROM users")
+        total_users = cursor.fetchone()["count"]
 
-    # 🔥 build friend set
+        cursor.execute(
+            """
+            SELECT
+                id,
+                name,
+                username,
+                email,
+                COALESCE("current_role", target_role, best_job_role, 'Developer') AS current_role,
+                skills,
+                projects,
+                roadmap,
+                profile_image,
+                COALESCE(profile_views, 0) AS profile_views
+            FROM users
+            ORDER BY
+                (COALESCE(profile_views, 0) + id) DESC,
+                id ASC
+            LIMIT %s OFFSET %s
+            """,
+            (limit, offset),
+        )
+        rows = cursor.fetchall()
+
+        # Always include logged-in user even if pagination/sorting would hide them.
+        if not any(r.get("id") == current_user_id for r in rows):
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    name,
+                    username,
+                    email,
+                    COALESCE("current_role", target_role, best_job_role, 'Developer') AS current_role,
+                    skills,
+                    projects,
+                    roadmap,
+                    profile_image,
+                    COALESCE(profile_views, 0) AS profile_views
+                FROM users
+                WHERE id=%s
+                """,
+                (current_user_id,),
+            )
+            me_row = cursor.fetchone()
+            if me_row:
+                rows.insert(0, me_row)
+
+        cursor.execute(
+            """
+            SELECT sender_id, receiver_id
+            FROM friend_requests
+            WHERE status='accepted'
+              AND (sender_id=%s OR receiver_id=%s)
+            """,
+            (current_user_id, current_user_id),
+        )
+        friendships = cursor.fetchall()
+
+        cursor.execute(
+            """
+            SELECT skills
+            FROM users
+            WHERE skills IS NOT NULL AND skills != '' AND skills != '[]'
+            LIMIT 1000
+            """
+        )
+        skill_rows = cursor.fetchall()
+
+    finally:
+        conn.close()
+
     friend_set = set()
     for f in friendships:
-        if f["sender_id"] == current_user_id:
-            friend_set.add(f["receiver_id"])
-        if f["receiver_id"] == current_user_id:
-            friend_set.add(f["sender_id"])
+        if f.get("sender_id") == current_user_id:
+            friend_set.add(f.get("receiver_id"))
+        if f.get("receiver_id") == current_user_id:
+            friend_set.add(f.get("sender_id"))
+
+    skill_counter = {}
+    for sr in skill_rows:
+        for skill in safe_json_loads(sr.get("skills"), []):
+            if skill:
+                skill_counter[skill] = skill_counter.get(skill, 0) + 1
 
     users = []
-    skill_counter = {}
+    seen_ids = set()
 
     for r in rows:
+        user_id = r.get("id")
+        if user_id in seen_ids:
+            continue
+        seen_ids.add(user_id)
 
-        skills = json.loads(r["skills"]) if r["skills"] else []
-        projects = json.loads(r["projects"]) if r["projects"] else []
-        roadmap = json.loads(r["roadmap"]) if r["roadmap"] else []
+        skills = safe_json_loads(r.get("skills"), [])
+        projects = safe_json_loads(r.get("projects"), [])
+        roadmap = safe_json_loads(r.get("roadmap"), [])
 
         modules_completed = sum(
             1
             for stage in roadmap
-            for s in stage.get("skills", [])
-            if s.get("status") == "Completed"
+            for item in stage.get("skills", [])
+            if item.get("status") == "Completed"
         )
-
-        for skill in skills:
-            skill_counter[skill] = skill_counter.get(skill, 0) + 1
 
         users.append(
             {
-                "id": r["id"],
-                "name": r["name"],
-                "role": r["current_role"] or "Developer",
+                "id": user_id,
+                "name": r.get("name") or r.get("username") or "User",
+                "email": r.get("email"),
+                "role": r.get("current_role") or "Developer",
                 "location": "Global",
-                "profile_image": r["profile_image"],
+                "profile_image": r.get("profile_image") or "",
                 "projectsBuilt": len(projects),
                 "modulesCompleted": modules_completed,
                 "skillsMastered": len(skills),
-                "profileViews": (
-                    r["profile_views"] if "profile_views" in r.keys() else 0
-                ),
+                "profileViews": r.get("profile_views") or 0,
                 "badges": ["Verified"],
-                # 🔥 NEW FIELD
-                "isFriend": r["id"] in friend_set,
+                "isFriend": user_id in friend_set,
+                "isSelf": user_id == current_user_id,
             }
         )
 
     trending_skill = max(skill_counter, key=skill_counter.get) if skill_counter else ""
 
-    return {"totalUsers": len(users), "trendingSkill": trending_skill, "users": users}
+    return {
+        "totalUsers": total_users,
+        "trendingSkill": trending_skill,
+        "currentUser": {
+            "id": current_user.get("id"),
+            "name": current_user.get("name") or current_user.get("username") or "User",
+            "email": current_user.get("email"),
+            "role": current_user.get("current_role") or "Developer",
+            "profile_image": current_user.get("profile_image") or "",
+        },
+        "users": users,
+        "limit": limit,
+        "offset": offset,
+    }
 
 
 @app.get("/user/{user_id}")
@@ -1656,7 +1871,7 @@ def get_user_profile(
     cursor = conn.cursor()
 
     # 🔍 get current user id
-    cursor.execute("SELECT id FROM users WHERE email=?", (email,))
+    cursor.execute("SELECT id FROM users WHERE email=%s", (email,))
     current = cursor.fetchone()
 
     if not current:
@@ -1665,7 +1880,7 @@ def get_user_profile(
     current_user_id = current["id"]
 
     # 🔍 fetch target user
-    cursor.execute("SELECT * FROM users WHERE id=?", (user_id,))
+    cursor.execute("SELECT * FROM users WHERE id=%s", (user_id,))
     user = cursor.fetchone()
 
     if not user:
@@ -1677,7 +1892,7 @@ def get_user_profile(
         cursor.execute(
             """
             SELECT viewed_at FROM profile_views_log
-            WHERE viewer_id=? AND viewed_id=?
+            WHERE viewer_id=%s AND viewed_id=%s
             ORDER BY viewed_at DESC LIMIT 1
         """,
             (current_user_id, user_id),
@@ -1697,7 +1912,7 @@ def get_user_profile(
                 """
                 UPDATE users 
                 SET profile_views = COALESCE(profile_views, 0) + 1 
-                WHERE id=?
+                WHERE id=%s
             """,
                 (user_id,),
             )
@@ -1706,7 +1921,7 @@ def get_user_profile(
             cursor.execute(
                 """
                 INSERT INTO profile_views_log (viewer_id, viewed_id, viewed_at)
-                VALUES (?, ?, ?)
+                VALUES (%s, %s, %s)
             """,
                 (current_user_id, user_id, datetime.utcnow().isoformat()),
             )
@@ -1718,14 +1933,10 @@ def get_user_profile(
     user = dict(user)
 
     # JSON parsing
-    user["skills"] = json.loads(user["skills"]) if user["skills"] else []
-    user["projects"] = json.loads(user["projects"]) if user["projects"] else []
-    user["certifications"] = (
-        json.loads(user["certifications"]) if user["certifications"] else []
-    )
-    user["professional_links"] = (
-        json.loads(user["professional_links"]) if user["professional_links"] else []
-    )
+    user["skills"] = safe_json_loads(user.get("skills"), [])
+    user["projects"] = safe_json_loads(user.get("projects"), [])
+    user["certifications"] = safe_json_loads(user.get("certifications"), [])
+    user["professional_links"] = safe_json_loads(user.get("professional_links"), [])
 
     return user
 
@@ -1748,7 +1959,7 @@ async def send_message(
     cursor = conn.cursor()
 
     # 🔍 Get sender
-    cursor.execute("SELECT id FROM users WHERE email=?", (email,))
+    cursor.execute("SELECT id FROM users WHERE email=%s", (email,))
     sender = cursor.fetchone()
 
     if not sender:
@@ -1757,7 +1968,7 @@ async def send_message(
     sender_id = sender["id"]
 
     # 🔍 Check receiver exists
-    cursor.execute("SELECT id FROM users WHERE id=?", (receiver_id,))
+    cursor.execute("SELECT id FROM users WHERE id=%s", (receiver_id,))
     receiver = cursor.fetchone()
 
     if not receiver:
@@ -1774,9 +1985,9 @@ async def send_message(
         WHERE 
         status='accepted' AND
         (
-            (sender_id=? AND receiver_id=?)
+            (sender_id=%s AND receiver_id=%s)
             OR
-            (sender_id=? AND receiver_id=?)
+            (sender_id=%s AND receiver_id=%s)
         )
         """,
         (sender_id, receiver_id, receiver_id, sender_id),
@@ -1821,7 +2032,7 @@ async def send_message(
             raise HTTPException(status_code=400, detail="Invalid file extension")
 
         filename = f"{uuid.uuid4()}.{ext}"
-        path = os.path.join("uploads", filename)
+        path = UPLOAD_DIR / filename
 
         with open(path, "wb") as f:
             f.write(contents)
@@ -1834,7 +2045,7 @@ async def send_message(
         """
         INSERT INTO direct_messages 
         (sender_id, receiver_id, message, file_url, file_type, file_name, created_at, is_read)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 0)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, 0)
         """,
         (
             sender_id,
@@ -1868,7 +2079,7 @@ def send_request(
     conn = get_db()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT id FROM users WHERE email=?", (email,))
+    cursor.execute("SELECT id FROM users WHERE email=%s", (email,))
     sender = cursor.fetchone()
 
     if not sender:
@@ -1884,9 +2095,9 @@ def send_request(
 SELECT * FROM friend_requests 
 WHERE 
 (
-    (sender_id=? AND receiver_id=?)
+    (sender_id=%s AND receiver_id=%s)
     OR
-    (sender_id=? AND receiver_id=?)
+    (sender_id=%s AND receiver_id=%s)
 )
 AND status IN ('pending', 'accepted')
 """,
@@ -1899,7 +2110,7 @@ AND status IN ('pending', 'accepted')
     cursor.execute(
         """
         INSERT INTO friend_requests (sender_id, receiver_id, created_at)
-        VALUES (?, ?, ?)
+        VALUES (%s, %s, %s)
     """,
         (sender_id, receiver_id, datetime.utcnow().isoformat()),
     )
@@ -1917,7 +2128,7 @@ def get_requests(credentials: HTTPAuthorizationCredentials = Depends(security)):
     conn = get_db()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT id FROM users WHERE email=?", (email,))
+    cursor.execute("SELECT id FROM users WHERE email=%s", (email,))
     user = cursor.fetchone()
 
     if not user:
@@ -1930,7 +2141,7 @@ def get_requests(credentials: HTTPAuthorizationCredentials = Depends(security)):
         SELECT fr.id, u.id as sender_id, u.name, u.profile_image
         FROM friend_requests fr
         JOIN users u ON fr.sender_id = u.id
-        WHERE fr.receiver_id=? AND fr.status='pending'
+        WHERE fr.receiver_id=%s AND fr.status='pending'
     """,
         (user_id,),
     )
@@ -1953,7 +2164,7 @@ def respond_request(
     cursor = conn.cursor()
 
     # 🔍 get current user
-    cursor.execute("SELECT id FROM users WHERE email=?", (email,))
+    cursor.execute("SELECT id FROM users WHERE email=%s", (email,))
     user = cursor.fetchone()
 
     if not user:
@@ -1964,7 +2175,7 @@ def respond_request(
     # 🔍 get request
     cursor.execute(
         """
-        SELECT receiver_id FROM friend_requests WHERE id=?
+        SELECT receiver_id FROM friend_requests WHERE id=%s
     """,
         (request_id,),
     )
@@ -1982,8 +2193,8 @@ def respond_request(
     cursor.execute(
         """
         UPDATE friend_requests 
-        SET status=? 
-        WHERE id=?
+        SET status=%s 
+        WHERE id=%s
     """,
         (status, request_id),
     )
@@ -1999,8 +2210,8 @@ def get_stats():
     conn = get_db()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT COUNT(*) FROM users")
-    total_users = cursor.fetchone()[0]
+    cursor.execute("SELECT COUNT(*) AS count FROM users")
+    total_users = cursor.fetchone()["count"]
 
     cursor.execute("SELECT projects, skills FROM users")
     rows = cursor.fetchall()
@@ -2037,7 +2248,7 @@ def get_friends(credentials: HTTPAuthorizationCredentials = Depends(security)):
     conn = get_db()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT id FROM users WHERE email=?", (email,))
+    cursor.execute("SELECT id FROM users WHERE email=%s", (email,))
     user = cursor.fetchone()
     user_id = user["id"]
 
@@ -2049,8 +2260,8 @@ def get_friends(credentials: HTTPAuthorizationCredentials = Depends(security)):
         ON (u.id = fr.sender_id OR u.id = fr.receiver_id)
         WHERE 
             fr.status='accepted'
-            AND (fr.sender_id=? OR fr.receiver_id=?)
-            AND u.id != ?
+            AND (fr.sender_id=%s OR fr.receiver_id=%s)
+            AND u.id != %s
     """,
         (user_id, user_id, user_id),
     )
@@ -2079,7 +2290,7 @@ async def create_post(
     if file:
         ext = file.filename.split(".")[-1]
         filename = f"{uuid.uuid4()}.{ext}"
-        path = os.path.join("uploads", filename)
+        path = UPLOAD_DIR / filename
 
         contents = await file.read()
         with open(path, "wb") as f:
@@ -2091,7 +2302,7 @@ async def create_post(
     cursor.execute(
         """
         INSERT INTO feed_posts (user_email, content, type, tags, image, created_at)
-        VALUES (?, ?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s, %s)
     """,
         (email, content, "POST", tags, image_path, datetime.utcnow().isoformat()),
     )
@@ -2117,7 +2328,7 @@ def change_password(
     conn = get_db()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT password FROM users WHERE email=?", (email,))
+    cursor.execute("SELECT password FROM users WHERE email=%s", (email,))
     user = cursor.fetchone()
 
     if not user:
@@ -2128,7 +2339,7 @@ def change_password(
 
     new_hashed = hash_password(data.new_password)
 
-    cursor.execute("UPDATE users SET password=? WHERE email=?", (new_hashed, email))
+    cursor.execute("UPDATE users SET password=%s WHERE email=%s", (new_hashed, email))
 
     conn.commit()
     conn.close()
@@ -2147,7 +2358,7 @@ def update_streak(credentials: HTTPAuthorizationCredentials = Depends(security))
     cursor.execute(
         """
         SELECT learning_streak, last_active_date
-        FROM users WHERE email=?
+        FROM users WHERE email=%s
     """,
         (email,),
     )
@@ -2182,8 +2393,8 @@ def update_streak(credentials: HTTPAuthorizationCredentials = Depends(security))
     cursor.execute(
         """
         UPDATE users
-        SET learning_streak=?, last_active_date=?
-        WHERE email=?
+        SET learning_streak=%s, last_active_date=%s
+        WHERE email=%s
     """,
         (streak, today.isoformat(), email),
     )
@@ -2203,7 +2414,7 @@ def remove_friend(
     conn = get_db()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT id FROM users WHERE email=?", (email,))
+    cursor.execute("SELECT id FROM users WHERE email=%s", (email,))
     current = cursor.fetchone()
 
     if not current:
@@ -2217,9 +2428,9 @@ def remove_friend(
         WHERE 
             status='accepted' AND
             (
-                (sender_id=? AND receiver_id=?)
+                (sender_id=%s AND receiver_id=%s)
                 OR
-                (sender_id=? AND receiver_id=?)
+                (sender_id=%s AND receiver_id=%s)
             )
     """,
         (current_user_id, user_id, user_id, current_user_id),
@@ -2232,161 +2443,173 @@ def remove_friend(
 
 
 @app.get("/feed")
-def get_feed(credentials: HTTPAuthorizationCredentials = Depends(security)):
+def get_feed(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    limit: int = Query(30, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+):
     email = verify_token(credentials.credentials)
 
     conn = get_db()
     cursor = conn.cursor()
 
-    cursor.execute(
-        """
-        SELECT f.*, u.name, u.profile_image
-        FROM feed_posts f
-        JOIN users u ON f.user_email = u.email
-        ORDER BY f.created_at DESC
-    """
-    )
-
-    posts = cursor.fetchall()
+    try:
+        cursor.execute(
+            """
+            SELECT
+                f.id,
+                f.user_email,
+                f.content,
+                f.type,
+                f.tags,
+                f.image,
+                f.created_at,
+                u.name,
+                u.profile_image,
+                COALESCE(l.like_count, 0) AS likes,
+                COALESCE(c.comment_count, 0) AS comments,
+                CASE WHEN ul.user_email IS NULL THEN FALSE ELSE TRUE END AS liked
+            FROM feed_posts f
+            JOIN users u ON f.user_email = u.email
+            LEFT JOIN (
+                SELECT post_id, COUNT(*) AS like_count
+                FROM post_likes
+                GROUP BY post_id
+            ) l ON l.post_id = f.id
+            LEFT JOIN (
+                SELECT post_id, COUNT(*) AS comment_count
+                FROM post_comments
+                GROUP BY post_id
+            ) c ON c.post_id = f.id
+            LEFT JOIN post_likes ul
+                ON ul.post_id = f.id AND ul.user_email = %s
+            ORDER BY f.created_at DESC
+            LIMIT %s OFFSET %s
+            """,
+            (email, limit, offset),
+        )
+        posts = cursor.fetchall()
+    finally:
+        conn.close()
 
     result = []
-
     for p in posts:
-        # 🔢 total likes
-        cursor.execute("SELECT COUNT(*) FROM post_likes WHERE post_id=?", (p["id"],))
-        likes = cursor.fetchone()[0]
-
-        # ❤️ check if current user liked
-        cursor.execute(
-            "SELECT 1 FROM post_likes WHERE post_id=? AND user_email=?",
-            (p["id"], email),
-        )
-        liked = cursor.fetchone() is not None
-
-        # 💬 total comments
-        cursor.execute("SELECT COUNT(*) FROM post_comments WHERE post_id=?", (p["id"],))
-        comments = cursor.fetchone()[0]
-
         result.append(
             {
-                "id": p["id"],
-                "content": p["content"],
-                "image": p["image"],
-                "type": p["type"],
-                "tags": json.loads(p["tags"]) if p["tags"] else [],
-                "created_at": p["created_at"],
-                "likes": likes,
-                "liked": liked,
-                "comments": comments,
+                "id": p.get("id"),
+                "content": p.get("content") or "",
+                "image": p.get("image"),
+                "type": p.get("type") or "POST",
+                "tags": safe_json_loads(p.get("tags"), []),
+                "created_at": p.get("created_at"),
+                "likes": p.get("likes") or 0,
+                "liked": bool(p.get("liked")),
+                "comments": p.get("comments") or 0,
                 "author": {
-                    "name": p["name"],
-                    "avatar": p["profile_image"] or "👤",
-                    "email": p["user_email"],
+                    "name": p.get("name") or "User",
+                    "avatar": p.get("profile_image") or "👤",
+                    "email": p.get("user_email"),
                 },
             }
         )
 
-    conn.close()
-
-    return {"posts": result}
+    return {"posts": result, "limit": limit, "offset": offset, "hasMore": len(result) == limit}
 
 
 @app.get("/messages/inbox")
-def get_inbox(credentials: HTTPAuthorizationCredentials = Depends(security)):
-
+def get_inbox(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+):
     email = verify_token(credentials.credentials)
 
     conn = get_db()
     cursor = conn.cursor()
 
-    # 🔍 get current user
-    cursor.execute("SELECT id FROM users WHERE email=?", (email,))
-    user = cursor.fetchone()
-    user_id = user["id"]
+    try:
+        cursor.execute("SELECT id FROM users WHERE email=%s", (email,))
+        user = cursor.fetchone()
 
-    # 🧠 get conversations
-    cursor.execute(
-        """
-        SELECT 
-            CASE 
-                WHEN sender_id = ? THEN receiver_id
-                ELSE sender_id
-            END as other_user_id,
-            MAX(created_at) as last_time
-        FROM direct_messages
-        WHERE sender_id = ? OR receiver_id = ?
-        GROUP BY other_user_id
-        ORDER BY last_time DESC
-        """,
-        (user_id, user_id, user_id),
-    )
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
 
-    rows = cursor.fetchall()
+        user_id = user["id"]
+
+        cursor.execute(
+            """
+            WITH visible_messages AS (
+                SELECT
+                    dm.*,
+                    CASE
+                        WHEN dm.sender_id = %s THEN dm.receiver_id
+                        ELSE dm.sender_id
+                    END AS other_user_id
+                FROM direct_messages dm
+                WHERE
+                    (
+                        dm.sender_id = %s
+                        AND COALESCE(dm.deleted_for_sender, 0) = 0
+                    )
+                    OR
+                    (
+                        dm.receiver_id = %s
+                        AND COALESCE(dm.deleted_for_receiver, 0) = 0
+                    )
+            ),
+            ranked_messages AS (
+                SELECT
+                    vm.*,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY vm.other_user_id
+                        ORDER BY vm.created_at DESC, vm.id DESC
+                    ) AS rn
+                FROM visible_messages vm
+            ),
+            unread_counts AS (
+                SELECT sender_id AS other_user_id, COUNT(*) AS unread_count
+                FROM direct_messages
+                WHERE receiver_id = %s AND COALESCE(is_read, 0) = 0
+                GROUP BY sender_id
+            )
+            SELECT
+                u.id AS user_id,
+                u.name,
+                u.profile_image,
+                rm.sender_id AS last_sender_id,
+                rm.message,
+                rm.file_type,
+                rm.created_at AS last_time,
+                COALESCE(uc.unread_count, 0) AS unread_count
+            FROM ranked_messages rm
+            JOIN users u ON u.id = rm.other_user_id
+            LEFT JOIN unread_counts uc ON uc.other_user_id = rm.other_user_id
+            WHERE rm.rn = 1
+            ORDER BY rm.created_at DESC, rm.id DESC
+            LIMIT %s OFFSET %s
+            """,
+            (user_id, user_id, user_id, user_id, limit, offset),
+        )
+        rows = cursor.fetchall()
+    finally:
+        conn.close()
+
     conversations = []
-
     for r in rows:
-        other_id = r["other_user_id"]
-
-        # 👤 get user info
-        cursor.execute(
-            "SELECT id, name, profile_image FROM users WHERE id=?",
-            (other_id,),
-        )
-        user_data = cursor.fetchone()
-
-        # 💬 last message
-        cursor.execute(
-            """
-            SELECT sender_id, message, file_url, file_type 
-            FROM direct_messages
-            WHERE 
-            (
-                sender_id=? AND receiver_id=? AND deleted_for_sender=0
-            )
-            OR
-            (
-                sender_id=? AND receiver_id=? AND deleted_for_receiver=0
-            )
-            ORDER BY created_at DESC LIMIT 1
-            """,
-            (user_id, other_id, other_id, user_id),
-        )
-
-        last_msg = cursor.fetchone()
-        if not last_msg:
-            continue
-
-        # 🔥 ADD THIS BLOCK (UNREAD COUNT)
-        cursor.execute(
-            """
-            SELECT COUNT(*) FROM direct_messages
-            WHERE sender_id=? 
-            AND receiver_id=? 
-            AND is_read=0
-            """,
-            (other_id, user_id),
-        )
-
-        unread_count = cursor.fetchone()[0]
-
-        # 📦 response
         conversations.append(
             {
-                "user_id": user_data["id"],
-                "name": user_data["name"],
-                "profile_image": user_data["profile_image"] or "",
-                "last_message": (
-                    last_msg["message"]
-                    if last_msg["message"]
-                    else f"📎 {last_msg['file_type'] or 'File'}"
-                ),
-                "last_sender_id": last_msg["sender_id"],
-                "unread_count": unread_count,  # 🔥 CRITICAL FIX
+                "user_id": r.get("user_id"),
+                "name": r.get("name") or "User",
+                "profile_image": r.get("profile_image") or "",
+                "last_message": r.get("message") or f"📎 {r.get('file_type') or 'File'}",
+                "last_sender_id": r.get("last_sender_id"),
+                "unread_count": r.get("unread_count") or 0,
+                "last_time": r.get("last_time"),
             }
         )
 
-    conn.close()
     return conversations
+
 
 @app.delete("/messages/{message_id}")
 def delete_message(
@@ -2400,7 +2623,7 @@ def delete_message(
     cursor = conn.cursor()
 
     # 🔍 get user id
-    cursor.execute("SELECT id FROM users WHERE email=?", (email,))
+    cursor.execute("SELECT id FROM users WHERE email=%s", (email,))
     user = cursor.fetchone()
 
     if not user:
@@ -2413,7 +2636,7 @@ def delete_message(
         """
         SELECT sender_id, receiver_id, file_url 
         FROM direct_messages 
-        WHERE id=?
+        WHERE id=%s
     """,
         (message_id,),
     )
@@ -2432,7 +2655,7 @@ def delete_message(
             """
             UPDATE direct_messages
             SET deleted_for_sender=1, deleted_for_receiver=1
-            WHERE id=?
+            WHERE id=%s
         """,
             (message_id,),
         )
@@ -2440,9 +2663,9 @@ def delete_message(
         # 🧹 delete file from storage
         if file_url:
             try:
-                file_path = file_url.replace("/uploads/", "uploads/")
-                if os.path.exists(file_path):
-                    os.remove(file_path)
+                file_path = UPLOAD_DIR / file_url.replace("/uploads/", "")
+                if file_path.exists():
+                    file_path.unlink()
             except Exception as e:
                 print("File delete error:", e)
 
@@ -2453,7 +2676,7 @@ def delete_message(
                 """
                 UPDATE direct_messages
                 SET deleted_for_sender=1
-                WHERE id=?
+                WHERE id=%s
             """,
                 (message_id,),
             )
@@ -2462,7 +2685,7 @@ def delete_message(
                 """
                 UPDATE direct_messages
                 SET deleted_for_receiver=1
-                WHERE id=?
+                WHERE id=%s
             """,
                 (message_id,),
             )
@@ -2485,7 +2708,7 @@ def get_messages(
     conn = get_db()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT id FROM users WHERE email=?", (email,))
+    cursor.execute("SELECT id FROM users WHERE email=%s", (email,))
     current = cursor.fetchone()
     current_user_id = current["id"]
 
@@ -2497,7 +2720,7 @@ def get_messages(
         """
         UPDATE direct_messages
         SET is_read = 1
-        WHERE sender_id=? AND receiver_id=?
+        WHERE sender_id=%s AND receiver_id=%s
         """,
         (user_id, current_user_id),
     )
@@ -2513,11 +2736,11 @@ def get_messages(
         JOIN users u ON dm.sender_id = u.id
         WHERE 
         (
-            dm.sender_id=? AND dm.receiver_id=? AND dm.deleted_for_sender=0
+            dm.sender_id=%s AND dm.receiver_id=%s AND dm.deleted_for_sender=0
         )
         OR
         (
-            dm.sender_id=? AND dm.receiver_id=? AND dm.deleted_for_receiver=0
+            dm.sender_id=%s AND dm.receiver_id=%s AND dm.deleted_for_receiver=0
         )
         ORDER BY dm.created_at ASC
         """,
@@ -2541,7 +2764,7 @@ def get_comments(post_id: int):
         SELECT c.*, u.name, u.profile_image
         FROM post_comments c
         JOIN users u ON c.user_email = u.email
-        WHERE c.post_id=?
+        WHERE c.post_id=%s
         ORDER BY c.created_at DESC
     """,
         (post_id,),
@@ -2608,6 +2831,22 @@ async def submit_answer(
         "next_question": next_question,
         "difficulty": next_difficulty,
         "question_number": session["question_number"],
+    }
+
+
+@app.get("/db/status")
+def db_status():
+    database_url = os.getenv("DATABASE_URL", "")
+    safe_url = database_url
+    if "@" in safe_url:
+        safe_url = "postgresql://***:***@" + safe_url.split("@", 1)[1]
+
+    return {
+        "database": "postgresql",
+        "sqlite_disabled": True,
+        "users_db_created_by_backend": False,
+        "database_url_set": bool(database_url),
+        "database_url_preview": safe_url,
     }
 
 

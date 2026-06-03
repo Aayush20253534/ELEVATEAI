@@ -552,7 +552,7 @@ const currentTheme = THEMES[theme] || THEMES.dark;
 
   fetchRequestsCount();
 
-  const interval = setInterval(fetchRequestsCount, 5000);
+  const interval = setInterval(fetchRequestsCount, 15000);
   return () => clearInterval(interval);
 }, [token]);
 useEffect(() => {
@@ -616,7 +616,7 @@ useEffect(() => {
       } catch (err) { console.error("Inbox error", err); }
     };
     fetchInbox();
-    const inv = setInterval(fetchInbox, 5000);
+    const inv = setInterval(fetchInbox, 15000);
     return () => clearInterval(inv);
   }, [token]);
 
@@ -662,7 +662,7 @@ const fetchUser = async () => {
   }
 };
     fetchChat();
-    const interval = setInterval(fetchChat, 3000);
+    const interval = setInterval(fetchChat, 7000);
     return () => clearInterval(interval);
   }, [receiver_id, token]);
 

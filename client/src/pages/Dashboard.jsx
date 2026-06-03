@@ -20,7 +20,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Sidebar from '../components/sidebar.jsx';
 import { useNavigate } from "react-router-dom";
 
-const API = import.meta.env.VITE_API_URL;
+const API = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 const StatCard = ({ icon: Icon, label, value, color }) => (
   <motion.div
@@ -230,7 +230,7 @@ useEffect(() => {
         <span className="text-slate-400 font-medium">Welcome back,</span>
 
         <span className="bg-gradient-to-r from-cyan-400 via-blue-400 to-violet-400 bg-clip-text text-transparent drop-shadow-[0_0_8px_rgba(34,211,238,0.3)]">
-          {user?.username || "Explorer"}
+          {user?.username || user?.name || JSON.parse(localStorage.getItem("user") || "{}").username || JSON.parse(localStorage.getItem("user") || "{}").name || "Explorer"}
         </span>
       </h1>
     </motion.div>

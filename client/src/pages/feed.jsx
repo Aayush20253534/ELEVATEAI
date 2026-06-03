@@ -298,27 +298,47 @@ const deleteComment = async (commentId) => {
 export default function ElevateFeed() {
 
   const [posts, setPosts] = useState([]);
+  const [loadingFeed, setLoadingFeed] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [offset, setOffset] = useState(0);
+  const FEED_LIMIT = 30;
   const fileInputRef = useRef(null);
   const [newPost, setNewPost] = useState("");
   const [user, setUser] = useState(null);
   const [selectedImage, setSelectedImage] = useState(null);
+  const fetchFeed = async (nextOffset = 0, append = false) => {
+    const token = localStorage.getItem("token");
+    if (!token || loadingFeed) return;
+
+    setLoadingFeed(true);
+    try {
+      const res = await axios.get(`${API}/feed?limit=${FEED_LIMIT}&offset=${nextOffset}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      const newPosts = res.data.posts || [];
+      setPosts(prev => append ? [...prev, ...newPosts] : newPosts);
+      setHasMore(Boolean(res.data.hasMore));
+      setOffset(nextOffset + newPosts.length);
+    } catch (err) {
+      console.log(err);
+    } finally {
+      setLoadingFeed(false);
+    }
+  };
+
   useEffect(() => {
-  const token = localStorage.getItem("token");
+    const token = localStorage.getItem("token");
 
-  // fetch feed
-  axios.get(`${API}/feed`, {
-    headers: { Authorization: `Bearer ${token}` }
-  })
-  .then(res => setPosts(res.data.posts))
-  .catch(err => console.log(err));
+    fetchFeed(0, false);
 
-  axios.get(`${API}/me`, {
-    headers: { Authorization: `Bearer ${token}` }
-  })
-  .then(res => setUser(res.data))
-  .catch(err => console.log(err));
+    axios.get(`${API}/me`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    .then(res => setUser(res.data))
+    .catch(err => console.log(err));
 
-}, []);
+  }, []);
   const createPost = async () => {
   if (!newPost.trim() && !selectedImage) return;
 
@@ -343,11 +363,7 @@ export default function ElevateFeed() {
     setNewPost("");
     setSelectedImage(null);
 
-    const res = await axios.get(`${API}/feed`, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-
-    setPosts(res.data.posts);
+    await fetchFeed(0, false);
 
   } catch (err) {
     console.log(err);
