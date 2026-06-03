@@ -656,8 +656,12 @@ def init_db():
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_post_comments_post_id ON post_comments(post_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_friend_requests_sender_receiver ON friend_requests(sender_id, receiver_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_friend_requests_status ON friend_requests(status)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_friend_requests_receiver_status ON friend_requests(receiver_id, status)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_friend_requests_sender_status ON friend_requests(sender_id, status)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_friend_requests_pair_status ON friend_requests(LEAST(sender_id, receiver_id), GREATEST(sender_id, receiver_id), status)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_direct_messages_sender_receiver ON direct_messages(sender_id, receiver_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_direct_messages_created_at ON direct_messages(created_at)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_direct_messages_receiver_read ON direct_messages(receiver_id, is_read)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_profile_views_log_viewer_viewed ON profile_views_log(viewer_id, viewed_id)")
 
     conn.commit()
@@ -2062,117 +2066,138 @@ async def send_message(
     conn = get_db()
     cursor = conn.cursor()
 
-    # 🔍 Get sender
-    cursor.execute("SELECT id FROM users WHERE email=%s", (email,))
-    sender = cursor.fetchone()
+    try:
+        # 🔍 Get sender
+        cursor.execute("SELECT id FROM users WHERE email=%s", (email,))
+        sender = cursor.fetchone()
 
-    if not sender:
-        raise HTTPException(status_code=404, detail="User not found")
+        if not sender:
+            raise HTTPException(status_code=404, detail="User not found")
 
-    sender_id = sender["id"]
+        sender_id = sender["id"]
 
-    # 🔍 Check receiver exists
-    cursor.execute("SELECT id FROM users WHERE id=%s", (receiver_id,))
-    receiver = cursor.fetchone()
+        # 🔍 Check receiver exists
+        cursor.execute("SELECT id FROM users WHERE id=%s", (receiver_id,))
+        receiver = cursor.fetchone()
 
-    if not receiver:
-        raise HTTPException(status_code=404, detail="Receiver not found")
+        if not receiver:
+            raise HTTPException(status_code=404, detail="Receiver not found")
 
-    # 🚫 Prevent self messaging
-    if sender_id == receiver_id:
-        raise HTTPException(status_code=400, detail="You cannot message yourself")
+        # 🚫 Prevent self messaging
+        if sender_id == receiver_id:
+            raise HTTPException(status_code=400, detail="You cannot message yourself")
 
-    # 🔒 ONLY ALLOW FRIENDS
-    cursor.execute(
-        """
-        SELECT * FROM friend_requests 
-        WHERE 
-        status='accepted' AND
-        (
-            (sender_id=%s AND receiver_id=%s)
-            OR
-            (sender_id=%s AND receiver_id=%s)
+        # 🔒 ONLY ALLOW FRIENDS
+        cursor.execute(
+            """
+            SELECT 1 FROM friend_requests
+            WHERE status='accepted' AND
+            (
+                (sender_id=%s AND receiver_id=%s)
+                OR
+                (sender_id=%s AND receiver_id=%s)
+            )
+            LIMIT 1
+            """,
+            (sender_id, receiver_id, receiver_id, sender_id),
         )
-        """,
-        (sender_id, receiver_id, receiver_id, sender_id),
-    )
 
-    if not cursor.fetchone():
-        raise HTTPException(status_code=403, detail="You can only message friends")
+        if not cursor.fetchone():
+            raise HTTPException(status_code=403, detail="You can only message friends")
 
-    # 🚫 Prevent empty message + no file
-    if not message and not file:
-        raise HTTPException(status_code=400, detail="Message or file required")
+        message = (message or "").strip()
 
-    file_url = None
-    file_type = None
-    file_name = None
+        # 🚫 Prevent empty message + no file
+        if not message and not file:
+            raise HTTPException(status_code=400, detail="Message or file required")
 
-    # 📎 HANDLE FILE
-    if file:
-        contents = await file.read()
-        file_name = file.filename
+        file_url = None
+        file_type = None
+        file_name = None
 
-        # 📏 File size limit
-        if len(contents) > 10 * 1024 * 1024:
-            raise HTTPException(status_code=400, detail="File too large (max 10MB)")
+        # 📎 HANDLE FILE
+        if file:
+            if not file.filename or "." not in file.filename:
+                raise HTTPException(status_code=400, detail="Invalid file name")
 
-        allowed_types = [
-            "image/png",
-            "image/jpeg",
-            "image/jpg",
-            "application/pdf",
-            "video/mp4",
-            "audio/mpeg",
-        ]
+            contents = await file.read()
+            file_name = file.filename
 
-        if file.content_type not in allowed_types:
-            raise HTTPException(status_code=400, detail="Unsupported file type")
+            # 📏 File size limit
+            if len(contents) == 0:
+                raise HTTPException(status_code=400, detail="Empty file")
 
-        SAFE_EXTENSIONS = ["png", "jpg", "jpeg", "pdf", "mp4", "mp3"]
-        ext = file.filename.split(".")[-1].lower()
+            if len(contents) > 10 * 1024 * 1024:
+                raise HTTPException(status_code=400, detail="File too large (max 10MB)")
 
-        if ext not in SAFE_EXTENSIONS:
-            raise HTTPException(status_code=400, detail="Invalid file extension")
+            allowed_types = [
+                "image/png",
+                "image/jpeg",
+                "image/jpg",
+                "application/pdf",
+                "video/mp4",
+                "audio/mpeg",
+            ]
 
-        filename = f"{uuid.uuid4()}.{ext}"
-        path = UPLOAD_DIR / filename
+            if file.content_type not in allowed_types:
+                raise HTTPException(status_code=400, detail="Unsupported file type")
 
-        with open(path, "wb") as f:
-            f.write(contents)
+            SAFE_EXTENSIONS = ["png", "jpg", "jpeg", "pdf", "mp4", "mp3"]
+            ext = file.filename.rsplit(".", 1)[-1].lower()
 
-        file_url = f"/uploads/{filename}"
-        file_type = file.content_type
+            if ext not in SAFE_EXTENSIONS:
+                raise HTTPException(status_code=400, detail="Invalid file extension")
 
-    # 💬 SAVE MESSAGE (🔥 FIX HERE)
-    cursor.execute(
-        """
-        INSERT INTO direct_messages 
-        (sender_id, receiver_id, message, file_url, file_type, file_name, created_at, is_read)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, 0)
-        """,
-        (
-            sender_id,
-            receiver_id,
-            message,
-            file_url,
-            file_type,
-            file_name,
-            datetime.utcnow().isoformat(),
-        ),
-    )
+            filename = f"{uuid.uuid4()}.{ext}"
+            path = UPLOAD_DIR / filename
 
-    conn.commit()
-    conn.close()
+            with open(path, "wb") as f:
+                f.write(contents)
 
-    return {
-        "message": "sent successfully",
-        "data": {
-            "receiver_id": receiver_id,
-            "text": message,
-            "file": file_url,
-        },
-    }
+            file_url = f"/uploads/{filename}"
+            file_type = file.content_type
+
+        # 💬 SAVE MESSAGE
+        cursor.execute(
+            """
+            INSERT INTO direct_messages
+            (sender_id, receiver_id, message, file_url, file_type, file_name, created_at, is_read, deleted_for_sender, deleted_for_receiver)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, 0, 0, 0)
+            RETURNING id, created_at
+            """,
+            (
+                sender_id,
+                receiver_id,
+                message,
+                file_url,
+                file_type,
+                file_name,
+                datetime.utcnow().isoformat(),
+            ),
+        )
+
+        saved = cursor.fetchone()
+        conn.commit()
+
+        return {
+            "message": "sent successfully",
+            "data": {
+                "id": saved["id"] if saved else None,
+                "receiver_id": receiver_id,
+                "text": message,
+                "file": file_url,
+                "file_type": file_type,
+                "file_name": file_name,
+                "created_at": saved["created_at"] if saved else None,
+            },
+        }
+
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cursor.close()
+        conn.close()
 
 @app.post("/friends/request/{receiver_id}")
 def send_request(
@@ -2183,46 +2208,84 @@ def send_request(
     conn = get_db()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT id FROM users WHERE email=%s", (email,))
-    sender = cursor.fetchone()
+    try:
+        cursor.execute("SELECT id FROM users WHERE email=%s", (email,))
+        sender = cursor.fetchone()
 
-    if not sender:
-        raise HTTPException(status_code=404, detail="User not found")
+        if not sender:
+            raise HTTPException(status_code=404, detail="User not found")
 
-    sender_id = sender["id"]
+        sender_id = sender["id"]
 
-    if sender_id == receiver_id:
-        raise HTTPException(status_code=400, detail="Cannot send request to yourself")
+        if sender_id == receiver_id:
+            raise HTTPException(status_code=400, detail="Cannot send request to yourself")
 
-    cursor.execute(
-        """
-SELECT * FROM friend_requests 
-WHERE 
-(
-    (sender_id=%s AND receiver_id=%s)
-    OR
-    (sender_id=%s AND receiver_id=%s)
-)
-AND status IN ('pending', 'accepted')
-""",
-        (sender_id, receiver_id, receiver_id, sender_id),
-    )
+        cursor.execute("SELECT id FROM users WHERE id=%s", (receiver_id,))
+        receiver = cursor.fetchone()
 
-    if cursor.fetchone():
-        raise HTTPException(status_code=400, detail="Request already sent")
+        if not receiver:
+            raise HTTPException(status_code=404, detail="Receiver not found")
 
-    cursor.execute(
-        """
-        INSERT INTO friend_requests (sender_id, receiver_id, created_at)
-        VALUES (%s, %s, %s)
-    """,
-        (sender_id, receiver_id, datetime.utcnow().isoformat()),
-    )
+        cursor.execute(
+            """
+            SELECT id, sender_id, receiver_id, status
+            FROM friend_requests
+            WHERE
+            (
+                (sender_id=%s AND receiver_id=%s)
+                OR
+                (sender_id=%s AND receiver_id=%s)
+            )
+            ORDER BY
+                CASE status
+                    WHEN 'accepted' THEN 1
+                    WHEN 'pending' THEN 2
+                    WHEN 'rejected' THEN 3
+                    ELSE 4
+                END,
+                id DESC
+            LIMIT 1
+            FOR UPDATE
+            """,
+            (sender_id, receiver_id, receiver_id, sender_id),
+        )
 
-    conn.commit()
-    conn.close()
+        existing = cursor.fetchone()
 
-    return {"message": "Request sent"}
+        if existing:
+            if existing["status"] == "accepted":
+                raise HTTPException(status_code=400, detail="You are already friends")
+
+            if existing["status"] == "pending":
+                raise HTTPException(status_code=400, detail="Friend request already pending")
+
+            # Reuse a rejected old request instead of creating duplicate rows forever.
+            cursor.execute(
+                """
+                UPDATE friend_requests
+                SET sender_id=%s, receiver_id=%s, status='pending', created_at=%s
+                WHERE id=%s
+                """,
+                (sender_id, receiver_id, datetime.utcnow().isoformat(), existing["id"]),
+            )
+        else:
+            cursor.execute(
+                """
+                INSERT INTO friend_requests (sender_id, receiver_id, status, created_at)
+                VALUES (%s, %s, 'pending', %s)
+                """,
+                (sender_id, receiver_id, datetime.utcnow().isoformat()),
+            )
+
+        conn.commit()
+        return {"message": "Request sent"}
+
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cursor.close()
+        conn.close()
 
 
 @app.get("/friends/requests")
@@ -2232,28 +2295,31 @@ def get_requests(credentials: HTTPAuthorizationCredentials = Depends(security)):
     conn = get_db()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT id FROM users WHERE email=%s", (email,))
-    user = cursor.fetchone()
+    try:
+        cursor.execute("SELECT id FROM users WHERE email=%s", (email,))
+        user = cursor.fetchone()
 
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
 
-    user_id = user["id"]
+        user_id = user["id"]
 
-    cursor.execute(
-        """
-        SELECT fr.id, u.id as sender_id, u.name, u.profile_image
-        FROM friend_requests fr
-        JOIN users u ON fr.sender_id = u.id
-        WHERE fr.receiver_id=%s AND fr.status='pending'
-    """,
-        (user_id,),
-    )
+        cursor.execute(
+            """
+            SELECT fr.id, u.id AS sender_id, u.name, u.profile_image, fr.created_at
+            FROM friend_requests fr
+            JOIN users u ON fr.sender_id = u.id
+            WHERE fr.receiver_id=%s AND fr.status='pending'
+            ORDER BY fr.created_at DESC, fr.id DESC
+            """,
+            (user_id,),
+        )
 
-    requests = cursor.fetchall()
-    conn.close()
-
-    return [dict(r) for r in requests]
+        requests = cursor.fetchall()
+        return [dict(r) for r in requests]
+    finally:
+        cursor.close()
+        conn.close()
 
 
 @app.post("/friends/respond/{request_id}")
@@ -2264,49 +2330,79 @@ def respond_request(
 ):
     email = verify_token(credentials.credentials)
 
+    action = (action or "").lower().strip()
+    if action not in ["accept", "reject"]:
+        raise HTTPException(status_code=400, detail="Invalid action")
+
     conn = get_db()
     cursor = conn.cursor()
 
-    # 🔍 get current user
-    cursor.execute("SELECT id FROM users WHERE email=%s", (email,))
-    user = cursor.fetchone()
+    try:
+        # 🔍 get current user
+        cursor.execute("SELECT id FROM users WHERE email=%s", (email,))
+        user = cursor.fetchone()
 
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
 
-    user_id = user["id"]
+        user_id = user["id"]
 
-    # 🔍 get request
-    cursor.execute(
-        """
-        SELECT receiver_id FROM friend_requests WHERE id=%s
-    """,
-        (request_id,),
-    )
-    req = cursor.fetchone()
+        # 🔍 get request and lock it during response
+        cursor.execute(
+            """
+            SELECT id, sender_id, receiver_id, status
+            FROM friend_requests
+            WHERE id=%s
+            FOR UPDATE
+            """,
+            (request_id,),
+        )
+        req = cursor.fetchone()
 
-    if not req:
-        raise HTTPException(status_code=404, detail="Request not found")
+        if not req:
+            raise HTTPException(status_code=404, detail="Request not found")
 
-    # 🚫 ensure only receiver can act
-    if req["receiver_id"] != user_id:
-        raise HTTPException(status_code=403, detail="Not allowed")
+        # 🚫 ensure only receiver can act
+        if req["receiver_id"] != user_id:
+            raise HTTPException(status_code=403, detail="Not allowed")
 
-    status = "accepted" if action == "accept" else "rejected"
+        if req["status"] != "pending":
+            raise HTTPException(status_code=400, detail=f"Request already {req['status']}")
 
-    cursor.execute(
-        """
-        UPDATE friend_requests 
-        SET status=%s 
-        WHERE id=%s
-    """,
-        (status, request_id),
-    )
+        status = "accepted" if action == "accept" else "rejected"
 
-    conn.commit()
-    conn.close()
+        cursor.execute(
+            """
+            UPDATE friend_requests
+            SET status=%s
+            WHERE id=%s
+            """,
+            (status, request_id),
+        )
 
-    return {"message": f"Request {status}"}
+        if status == "accepted":
+            # Avoid stale reverse pending requests creating confusing duplicate UI state.
+            cursor.execute(
+                """
+                UPDATE friend_requests
+                SET status='rejected'
+                WHERE status='pending'
+                  AND sender_id=%s
+                  AND receiver_id=%s
+                  AND id<>%s
+                """,
+                (req["receiver_id"], req["sender_id"], request_id),
+            )
+
+        conn.commit()
+        return {"message": f"Request {status}"}
+
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cursor.close()
+        conn.close()
 
 
 @app.get("/stats")
@@ -2352,28 +2448,38 @@ def get_friends(credentials: HTTPAuthorizationCredentials = Depends(security)):
     conn = get_db()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT id FROM users WHERE email=%s", (email,))
-    user = cursor.fetchone()
-    user_id = user["id"]
+    try:
+        cursor.execute("SELECT id FROM users WHERE email=%s", (email,))
+        user = cursor.fetchone()
 
-    cursor.execute(
-        """
-        SELECT u.id, u.name, u.profile_image
-        FROM friend_requests fr
-        JOIN users u 
-        ON (u.id = fr.sender_id OR u.id = fr.receiver_id)
-        WHERE 
-            fr.status='accepted'
-            AND (fr.sender_id=%s OR fr.receiver_id=%s)
-            AND u.id != %s
-    """,
-        (user_id, user_id, user_id),
-    )
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
 
-    friends = cursor.fetchall()
-    conn.close()
+        user_id = user["id"]
 
-    return [dict(f) for f in friends]
+        cursor.execute(
+            """
+            SELECT DISTINCT u.id, u.name, u.profile_image
+            FROM friend_requests fr
+            JOIN users u
+            ON u.id = CASE
+                WHEN fr.sender_id=%s THEN fr.receiver_id
+                ELSE fr.sender_id
+            END
+            WHERE
+                fr.status='accepted'
+                AND (fr.sender_id=%s OR fr.receiver_id=%s)
+                AND u.id != %s
+            ORDER BY u.name ASC, u.id ASC
+            """,
+            (user_id, user_id, user_id, user_id),
+        )
+
+        friends = cursor.fetchall()
+        return [dict(f) for f in friends]
+    finally:
+        cursor.close()
+        conn.close()
 
 
 @app.post("/feed/create")
@@ -2673,7 +2779,9 @@ def get_inbox(
             unread_counts AS (
                 SELECT sender_id AS other_user_id, COUNT(*) AS unread_count
                 FROM direct_messages
-                WHERE receiver_id = %s AND COALESCE(is_read, 0) = 0
+                WHERE receiver_id = %s
+                  AND COALESCE(is_read, 0) = 0
+                  AND COALESCE(deleted_for_receiver, 0) = 0
                 GROUP BY sender_id
             )
             SELECT
@@ -2726,80 +2834,90 @@ def delete_message(
     conn = get_db()
     cursor = conn.cursor()
 
-    # 🔍 get user id
-    cursor.execute("SELECT id FROM users WHERE email=%s", (email,))
-    user = cursor.fetchone()
+    try:
+        # 🔍 get user id
+        cursor.execute("SELECT id FROM users WHERE email=%s", (email,))
+        user = cursor.fetchone()
 
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
 
-    user_id = user["id"]
+        user_id = user["id"]
 
-    # 🔍 get message + file
-    cursor.execute(
-        """
-        SELECT sender_id, receiver_id, file_url 
-        FROM direct_messages 
-        WHERE id=%s
-    """,
-        (message_id,),
-    )
-    msg = cursor.fetchone()
-
-    if not msg:
-        raise HTTPException(status_code=404, detail="Message not found")
-
-    sender_id = msg["sender_id"]
-    receiver_id = msg["receiver_id"]
-    file_url = msg["file_url"]
-
-    # 🔥 DELETE FOR EVERYONE (only sender allowed)
-    if delete_for_everyone and user_id == sender_id:
+        # 🔍 get message + file
         cursor.execute(
             """
-            UPDATE direct_messages
-            SET deleted_for_sender=1, deleted_for_receiver=1
+            SELECT sender_id, receiver_id, file_url
+            FROM direct_messages
             WHERE id=%s
-        """,
+            FOR UPDATE
+            """,
             (message_id,),
         )
+        msg = cursor.fetchone()
 
-        # 🧹 delete file from storage
-        if file_url:
-            try:
-                file_path = UPLOAD_DIR / file_url.replace("/uploads/", "")
-                if file_path.exists():
-                    file_path.unlink()
-            except Exception as e:
-                print("File delete error:", e)
+        if not msg:
+            raise HTTPException(status_code=404, detail="Message not found")
 
-    # 🧠 DELETE FOR ME
-    else:
-        if user_id == sender_id:
+        sender_id = msg["sender_id"]
+        receiver_id = msg["receiver_id"]
+        file_url = msg["file_url"]
+
+        if user_id not in [sender_id, receiver_id]:
+            raise HTTPException(status_code=403, detail="Not allowed")
+
+        # 🔥 DELETE FOR EVERYONE (only sender allowed)
+        if delete_for_everyone:
+            if user_id != sender_id:
+                raise HTTPException(status_code=403, detail="Only sender can delete for everyone")
+
+            cursor.execute(
+                """
+                UPDATE direct_messages
+                SET deleted_for_sender=1, deleted_for_receiver=1
+                WHERE id=%s
+                """,
+                (message_id,),
+            )
+
+            # 🧹 delete file from storage
+            if file_url:
+                try:
+                    file_path = UPLOAD_DIR / file_url.replace("/uploads/", "")
+                    if file_path.exists() and file_path.is_file():
+                        file_path.unlink()
+                except Exception as e:
+                    print("File delete error:", e)
+
+        # 🧠 DELETE FOR ME
+        elif user_id == sender_id:
             cursor.execute(
                 """
                 UPDATE direct_messages
                 SET deleted_for_sender=1
                 WHERE id=%s
-            """,
+                """,
                 (message_id,),
             )
-        elif user_id == receiver_id:
+        else:
             cursor.execute(
                 """
                 UPDATE direct_messages
                 SET deleted_for_receiver=1
                 WHERE id=%s
-            """,
+                """,
                 (message_id,),
             )
-        else:
-            raise HTTPException(status_code=403, detail="Not allowed")
 
-    conn.commit()
-    conn.close()
+        conn.commit()
+        return {"message": "deleted"}
 
-    return {"message": "deleted"}
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cursor.close()
+        conn.close()
 
 
 @app.get("/messages/{user_id}")
@@ -2812,51 +2930,72 @@ def get_messages(
     conn = get_db()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT id FROM users WHERE email=%s", (email,))
-    current = cursor.fetchone()
-    current_user_id = current["id"]
+    try:
+        cursor.execute("SELECT id FROM users WHERE email=%s", (email,))
+        current = cursor.fetchone()
 
-    if current_user_id == user_id:
-        raise HTTPException(status_code=400, detail="Invalid conversation")
+        if not current:
+            raise HTTPException(status_code=404, detail="User not found")
 
-    # 🔥 MARK AS READ
-    cursor.execute(
-        """
-        UPDATE direct_messages
-        SET is_read = 1
-        WHERE sender_id=%s AND receiver_id=%s
-        """,
-        (user_id, current_user_id),
-    )
+        current_user_id = current["id"]
 
-    # 💬 fetch messages
-    cursor.execute(
-        """
-        SELECT 
-            dm.*,
-            u.profile_image,
-            u.name as sender_name
-        FROM direct_messages dm
-        JOIN users u ON dm.sender_id = u.id
-        WHERE 
-        (
-            dm.sender_id=%s AND dm.receiver_id=%s AND dm.deleted_for_sender=0
+        if current_user_id == user_id:
+            raise HTTPException(status_code=400, detail="Invalid conversation")
+
+        cursor.execute("SELECT id FROM users WHERE id=%s", (user_id,))
+        other = cursor.fetchone()
+
+        if not other:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # 🔥 MARK AS READ only for visible incoming messages
+        cursor.execute(
+            """
+            UPDATE direct_messages
+            SET is_read = 1
+            WHERE sender_id=%s
+              AND receiver_id=%s
+              AND COALESCE(deleted_for_receiver, 0) = 0
+            """,
+            (user_id, current_user_id),
         )
-        OR
-        (
-            dm.sender_id=%s AND dm.receiver_id=%s AND dm.deleted_for_receiver=0
+
+        # 💬 fetch messages
+        cursor.execute(
+            """
+            SELECT
+                dm.*,
+                u.profile_image,
+                u.name as sender_name
+            FROM direct_messages dm
+            JOIN users u ON dm.sender_id = u.id
+            WHERE
+            (
+                dm.sender_id=%s
+                AND dm.receiver_id=%s
+                AND COALESCE(dm.deleted_for_sender, 0)=0
+            )
+            OR
+            (
+                dm.sender_id=%s
+                AND dm.receiver_id=%s
+                AND COALESCE(dm.deleted_for_receiver, 0)=0
+            )
+            ORDER BY dm.created_at ASC, dm.id ASC
+            """,
+            (current_user_id, user_id, user_id, current_user_id),
         )
-        ORDER BY dm.created_at ASC
-        """,
-        (current_user_id, user_id, user_id, current_user_id),
-    )
 
-    messages = cursor.fetchall()
+        messages = cursor.fetchall()
+        conn.commit()
+        return [dict(m) for m in messages]
 
-    conn.commit()
-    conn.close()
-
-    return [dict(m) for m in messages]
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cursor.close()
+        conn.close()
 
 @app.get("/feed/comments/{post_id}")
 def get_comments(post_id: int):
