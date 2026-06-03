@@ -102,6 +102,9 @@ RESUME_DIR.mkdir(exist_ok=True)
 app = FastAPI()
 roadmap_engine = Roadmap()
 
+@app.get("/")
+def root():
+    return {"message": "ElevateAI backend is running"}
 # -------- MOUNT AFTER CREATION -------- #
 app.mount("/images", StaticFiles(directory=str(PROFILE_DIR)), name="images")
 app.mount("/resume-files", StaticFiles(directory=str(RESUME_DIR)), name="resume-files")
