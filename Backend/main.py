@@ -105,6 +105,11 @@ roadmap_engine = Roadmap()
 @app.get("/")
 def root():
     return {"message": "ElevateAI backend is running"}
+
+@app.get("/health")
+async def health():
+    return {"status": "healthy"}
+    
 # -------- MOUNT AFTER CREATION -------- #
 app.mount("/images", StaticFiles(directory=str(PROFILE_DIR)), name="images")
 app.mount("/resume-files", StaticFiles(directory=str(RESUME_DIR)), name="resume-files")
