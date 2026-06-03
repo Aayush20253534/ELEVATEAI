@@ -17,7 +17,6 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from Roadmap import Roadmap
 from dotenv import load_dotenv
 from fastapi.staticfiles import StaticFiles
-from transformers import pipeline
 from pathlib import Path
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -25,7 +24,6 @@ from psycopg2.extras import RealDictCursor
 
 import uuid
 import tempfile
-import torch
 import os
 import json
 import traceback
@@ -44,17 +42,45 @@ from agentic_workflow.resume_builder_agent.main import generate_resume
 
 # ---------- #
 
+# ---------- AUDIO TRANSCRIPTION CONFIG ---------- #
+# Production-safe: do NOT import torch/transformers at startup.
+# Local Whisper can still be enabled manually with USE_LOCAL_WHISPER=true,
+# but keep it false on Render/free servers.
+
+USE_LOCAL_WHISPER = os.getenv("USE_LOCAL_WHISPER", "false").lower() == "true"
 asr_pipeline = None
 
+
 def get_asr_pipeline():
+    """
+    Lazy-load local Whisper only when explicitly enabled.
+    This prevents Render 512MB instances from crashing during startup.
+    """
     global asr_pipeline
+
+    if not USE_LOCAL_WHISPER:
+        raise HTTPException(
+            status_code=503,
+            detail="Local Whisper is disabled in production. Use GROQ_API_KEY for transcription.",
+        )
+
     if asr_pipeline is None:
-        print("🚀 Loading Whisper model...")
+        print("🚀 Loading local Whisper model...")
+        try:
+            from transformers import pipeline
+            import torch
+        except Exception as e:
+            raise HTTPException(
+                status_code=503,
+                detail=f"Local Whisper dependencies are not installed: {str(e)}",
+            )
+
         asr_pipeline = pipeline(
             "automatic-speech-recognition",
-            model="openai/whisper-small",
-            device=0 if torch.cuda.is_available() else -1
+            model=os.getenv("WHISPER_MODEL", "openai/whisper-tiny"),
+            device=0 if torch.cuda.is_available() else -1,
         )
+
     return asr_pipeline
 
 
@@ -711,20 +737,69 @@ def verify_token(token: str):
 
 
 def transcribe_audio(file_path, language=None):
+    """
+    Production transcription:
+    - Uses Groq Whisper API if GROQ_API_KEY is available.
+    - Falls back to local Whisper only when USE_LOCAL_WHISPER=true.
+    """
+    groq_api_key = os.getenv("GROQ_API_KEY")
+
+    if groq_api_key:
+        try:
+            import requests
+        except Exception:
+            raise HTTPException(
+                status_code=500,
+                detail="requests package is required for Groq transcription. Add requests to requirements.txt.",
+            )
+
+        url = "https://api.groq.com/openai/v1/audio/transcriptions"
+
+        with open(file_path, "rb") as audio_file:
+            files = {
+                "file": (
+                    os.path.basename(file_path),
+                    audio_file,
+                    "audio/wav",
+                )
+            }
+
+            data = {
+                "model": os.getenv("GROQ_TRANSCRIPTION_MODEL", "whisper-large-v3-turbo"),
+            }
+
+            if language and language != "auto":
+                data["language"] = language
+
+            response = requests.post(
+                url,
+                headers={"Authorization": f"Bearer {groq_api_key}"},
+                files=files,
+                data=data,
+                timeout=120,
+            )
+
+        if response.status_code >= 400:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Groq transcription failed: {response.text}",
+            )
+
+        payload = response.json()
+        return payload.get("text", "")
+
+    # Local fallback, disabled on production unless explicitly enabled.
     pipe = get_asr_pipeline()
 
-    kwargs = {"task": "transcribe"}
-    if language and language != "en":
-        kwargs["language"] = language
+    generate_kwargs = {
+        "task": "transcribe",
+        "max_new_tokens": 200,
+    }
 
-    result = pipe(
-            file_path,
-            generate_kwargs={
-                "task": "transcribe",
-                "max_new_tokens": 200   # 🔥 add this
-            }
-        )
+    if language and language not in ["en", "auto"]:
+        generate_kwargs["language"] = language
 
+    result = pipe(file_path, generate_kwargs=generate_kwargs)
     return result["text"]
 
 def translate_to_english(text):
@@ -748,33 +823,49 @@ Rules:
 import asyncio
 
 @app.post("/audio/process")
-async def process_audio(file: UploadFile = File(...), language: str = Form(...)):
+async def process_audio(file: UploadFile = File(...), language: str = Form("auto")):
+    """
+    Speech-to-text endpoint.
+    Production uses Groq Whisper API via GROQ_API_KEY.
+    Local Whisper only runs when USE_LOCAL_WHISPER=true.
+    """
     try:
         print("📥 Audio received")
 
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
+        suffix = Path(file.filename or "audio.wav").suffix or ".wav"
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
             content = await file.read()
+
+            if not content:
+                raise HTTPException(status_code=400, detail="Empty audio file")
+
             tmp.write(content)
             path = tmp.name
 
         print("🧠 Transcribing...")
 
-        # 🔥 FIX HERE
         transcription = await asyncio.to_thread(transcribe_audio, path, language)
 
         print("✅ Done")
 
-        os.remove(path)
+        try:
+            os.remove(path)
+        except Exception:
+            pass
 
         return {
             "original_language": language,
             "transcription": transcription,
         }
 
-    except Exception as e:
-        print("❌ ERROR:", str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+    except HTTPException:
+        raise
 
+    except Exception as e:
+        traceback.print_exc()
+        print("❌ AUDIO ERROR:", str(e))
+        raise HTTPException(status_code=500, detail=str(e))
 
 # ---------------- AUTH ROUTES ---------------- #
 
