@@ -20,7 +20,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Sidebar from '../components/sidebar.jsx';
 import { useNavigate } from "react-router-dom";
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const API = import.meta.env.VITE_API_URL || "https://elevateai-0xxl.onrender.com";
 
 const StatCard = ({ icon: Icon, label, value, color }) => (
   <motion.div

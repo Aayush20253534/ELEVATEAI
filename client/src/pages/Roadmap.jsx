@@ -9,7 +9,7 @@ import {
 import jsPDF from 'jspdf';
 import Sidebar from '../components/sidebar';
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const API = import.meta.env.VITE_API_URL || "https://elevateai-0xxl.onrender.com";
 const ROLE_SKILLS = {
   "AI Engineer": ["Python", "PyTorch", "Transformers", "MLOps", "Deep Learning"],
   "Backend Developer": ["Node.js", "Databases", "API Design", "Docker", "System Design"],

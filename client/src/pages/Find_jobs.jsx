@@ -14,7 +14,7 @@ import {
 import Sidebar from "../components/sidebar";
 import axios from "axios";
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const API = import.meta.env.VITE_API_URL || "https://elevateai-0xxl.onrender.com";
 const FindJobs = () => {
   const location = useLocation();
   const [loading, setLoading] = useState(false);

@@ -14,7 +14,7 @@ import {
 import Sidebar from '../components/sidebar';
 import Header from '../components/header';
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const API = import.meta.env.VITE_API_URL || "https://elevateai-0xxl.onrender.com";
 const Badge = ({ children, variant = 'default' }) => {
   const styles = {
     default: "bg-white/10 text-slate-300",
