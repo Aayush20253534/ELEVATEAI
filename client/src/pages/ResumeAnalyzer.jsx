@@ -12,7 +12,7 @@ import {
 import Header from '../components/header';
 import Sidebar from '../components/sidebar';
 
-const API = import.meta.env.VITE_API_URL || "https://elevateai-0xxl.onrender.com";
+const API = import.meta.env.VITE_API_URL || "https://elevateai-h83p.onrender.com";
 const GlassCard = ({ children, className = "" }) => (
   <motion.div
     initial={{ opacity: 0, y: 20 }}
