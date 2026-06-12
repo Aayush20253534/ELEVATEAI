@@ -9,7 +9,7 @@ import {
 import Sidebar from '../components/sidebar';
 import { useNavigate } from "react-router-dom";
 
-const API = import.meta.env.VITE_API_URL || "https://elevateai-0xxl.onrender.com";
+const API = import.meta.env.VITE_API_URL || "https://elevateai-h83p.onrender.com";
 
 const getPageCache = () => {
   window.__ELEVATEAI_PAGE_CACHE__ = window.__ELEVATEAI_PAGE_CACHE__ || {};
