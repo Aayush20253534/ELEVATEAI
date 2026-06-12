@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import Sidebar from '../components/sidebar.jsx';
 
-const API = import.meta.env.VITE_API_URL || "https://elevateai-0xxl.onrender.com";
+const API = import.meta.env.VITE_API_URL || "https://elevateai-h83p.onrender.com";
 const Card = ({ children, title, icon: Icon }) => (
   <motion.div
     whileHover={{ y: -1, boxShadow: '0 10px 30px -10px rgba(255,255,255,0.03)' }}
