@@ -10,7 +10,7 @@ import Sidebar from '../components/sidebar';
 import { Users } from "lucide-react";
 import { Check, X } from "lucide-react";
 
-const API = import.meta.env.VITE_API_URL || "https://elevateai-0xxl.onrender.com";
+const API = import.meta.env.VITE_API_URL || "https://elevateai-h83p.onrender.com";
 
 const EMOJIS = [
   "😀","😂","🤣","😍","❤️","🔥","👍","👏","😎","💯",
