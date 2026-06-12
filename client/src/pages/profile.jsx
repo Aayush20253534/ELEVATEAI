@@ -10,7 +10,7 @@ import Sidebar from '../components/sidebar';
 import axios from "axios";
 import { useParams } from "react-router-dom";
 
-const API = import.meta.env.VITE_API_URL || "https://elevateai-0xxl.onrender.com";
+const API = import.meta.env.VITE_API_URL || "https://elevateai-h83p.onrender.com";
 
 // ─── Cache ────────────────────────────────────────────────────────────────────
 const getPageCache = () => {
