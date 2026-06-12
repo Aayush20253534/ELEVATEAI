@@ -11,7 +11,7 @@ import axios from "axios";
 import img1 from "../assets/1.jpg";
 import img2 from "../assets/2.jpg";
 
-const API = import.meta.env.VITE_API_URL || "https://elevateai-0xxl.onrender.com";
+const API = import.meta.env.VITE_API_URL || "https://elevateai-h83p.onrender.com";
 const GlassCard = ({ children, className = "" }) => (
   <motion.div 
     whileHover={{ 
